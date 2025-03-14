@@ -1,0 +1,57 @@
+# Node.js Modules
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+build/
+
+# Dependency directories
+jspm_packages/
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Environment variables
+.env
+.env.*.local
+
+# IDE/Editor settings
+.idea/
+.vscode/
+*.swp
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Optional npm cache directory
+.npm/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing outputs
+coverage/
+
+# Miscellaneous
+*.log
+*.bak
+*.tmp
+
+# Package-lock for Yarn (if you use npm, this can be removed)
+yarn.lock
+
+# Ignore local static files
+*.local
+
+# Generated directories for Node gyp
+build/Release
+src/config/keys/

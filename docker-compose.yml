@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+    ports:
+      - "3000:3000" # Backend sẽ lắng nghe trên cổng 3000
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306 # Kết nối nội bộ giữa backend và MySQL trong mạng Docker
+      DB_USER: duc
+      DB_PASSWORD: rootpassword
+      DB_NAME: karaoke_app
+    depends_on:
+      - mysql
+    networks:
+      - karaoke-network
+
+  mysql:
+    image: mysql:8
+    container_name: karaoke-mysql # Đặt tên container MySQL
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: karaoke_app
+      MYSQL_PASSWORD: 123456
+    ports:
+      - "3307:3306" # Đổi cổng từ 3306 thành 3307 trên host để tránh xung đột
+    networks:
+      - karaoke-network
+
+networks:
+  karaoke-network:
+    driver: bridge
