@@ -8,12 +8,11 @@ const adminRoutes = require('./src/routes/adminRoute');
 const songRoutes = require('./src/routes/songRoute');
 const liveStreamRoute = require('./src/routes/liveStreamRoute');
 const sequelize = require('./src/config/database');
+const path = require('path');
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
-
 
 // Routes
 app.use('/api', userRoutes);

@@ -55,3 +55,4 @@ yarn.lock
 # Generated directories for Node gyp
 build/Release
 src/config/keys/
+serviceAccountKey.json

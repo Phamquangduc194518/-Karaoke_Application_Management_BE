@@ -3,7 +3,10 @@ const express = require('express');
 const router = express.Router();
 const UserController = require('../controllers/userController')
 const { authenticateToken, authorizeRole } = require('../authMiddleware');
-const { upload, uploadAvatar } = require('../controllers/userController');
+const multer = require('multer');
+// Sử dụng memory storage: file sẽ được lưu trong req.file.buffer
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 router.post('/register', UserController.register);
 router.post('/login', UserController.login);
@@ -35,4 +38,13 @@ router.get('/getCommentVideoList/:video_id',UserController.getCommentVideoList)
 
 router.post('/verifyPurchase', UserController.verifyPurchase);
 router.post('/uploadAvatar',authenticateToken,upload.single('image'),UserController.uploadAvatar);
+router.post('/uploadImagePost',upload.single('image'),UserController.uploadImagePost)
+
+router.post('/stickers',UserController.createSticker)
+router.get('/stickers',UserController.getSticker)
+
+router.get('/search', UserController.search);
+
+router.get('/getFollowNotification', authenticateToken,UserController.getFollowNotification);
+
 module.exports = router;

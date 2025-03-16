@@ -6,7 +6,8 @@ const AlbumSong = require('./AlbumSong');
 const Favorite = require('./Favorites');
 const Follow = require('./Follow');
 const Video = require('./Video')
-const CommentsVideo = require('./CommentsVideo')
+const CommentsVideo = require('./CommentsVideo');
+const NotificationUser = require('./NotificationUser');
 
 // Thiết lập quan hệ giữa các model
 
@@ -46,6 +47,9 @@ AlbumSong.belongsTo(Song, { foreignKey: 'song_id', as: 'song' });
 
 CommentsVideo.belongsTo(Video, {foreignKey:'video_id'})
 CommentsVideo.belongsTo(User,{foreignKey:'user_id', as: 'user'})
+
+NotificationUser.belongsTo(User, { foreignKey: 'sender_id', as: 'user' });
+
 // Export các model
 module.exports = {
   User,

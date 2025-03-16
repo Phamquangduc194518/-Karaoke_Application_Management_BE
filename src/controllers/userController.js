@@ -11,9 +11,12 @@ const Song = require('../model/Song');
 const Follow = require('../model/Follow');
 const CommentsVideo = require('../model/CommentsVideo');
 const Subscription = require('../model/Subscription');
+const fs = require('fs');
+const streamifier = require('streamifier');
 const { google } = require('googleapis');
-const multer = require('multer');
-const path = require('path');
+const Sticker = require('../model/Sticker');
+const { Op } = require('sequelize');
+const NotificationUser = require('../model/NotificationUser');
 
 
 const register = async (req, res) => {
@@ -104,10 +107,10 @@ const login = async (req, res) => {
 const updateProfile = async (req, res)=>{
 
   const userId = req.user.id// Lấy từ JWT
-  const { username, phone, password, date_of_birth, gender, email, avatar_url } = req.body;
+  const { username, slogan, phone, password, date_of_birth, gender, email, avatar_url } = req.body;
   try{
     // Kiểm tra nếu tất cả các trường đều rỗng hoặc thiếu
-    if (!username && !phone && !password && !date_of_birth && !gender && !email && !avatar_url) {
+    if (!username && !phone && !password && !date_of_birth && !gender && !email && !avatar_url && !slogan) {
       return res.status(400).send('Không có dữ liệu nào để cập nhật');
     }
 
@@ -121,6 +124,7 @@ const updateProfile = async (req, res)=>{
     if (gender) updateData.gender = gender;
     if (email) updateData.email = email;
     if (avatar_url) updateData.avatar_url = avatar_url;
+    if (slogan) updateData.slogan = slogan
 
     const updateUser  = await User.update(updateData,{where:{id : userId}})
       if (updateUser[0] === 0) return res.status(404).send('Người dùng không tồn tại');
@@ -140,7 +144,7 @@ const userProfile = async (req, res)=>{
     }else{
       const userInfo = await User.findOne({
         where :{id: userId},
-        attributes: ["user_id","username", "email", "password", "phone", "date_of_birth", "gender", "avatar_url"]
+        attributes: ["user_id","username", "email", "slogan", "password", "phone", "date_of_birth", "gender", "avatar_url"]
       });
       if (!userInfo) {
         return res.status(404).json({ message: "Người dùng không tồn tại" }); // Nếu người dùng không tồn tại
@@ -265,9 +269,9 @@ const getRecordedSongList = async(req, res) => {
 const CreateComment = async (req, res) =>{
   try{
       const user_id = req.user.id;
-      const {song_id, comment_text} = req.body;
+      const {song_id, comment_text, url_sticker, url_image} = req.body;
 
-      if(!comment_text || !song_id){
+      if(!song_id && !comment_text && !url_sticker && !url_image){
         return res.status(400).json({
           message: 'Chưa bình luận',
         });
@@ -276,7 +280,9 @@ const CreateComment = async (req, res) =>{
       const comment = await Comments.create({
         user_id,
         song_id,
-        comment_text
+        comment_text: comment_text || "",
+        url_sticker: url_sticker || null,
+        url_image: url_image || null,
       });
       return res.status(201).json(comment);
   }catch(error){
@@ -457,6 +463,12 @@ const followUser = async(req, res) =>{
       return res.status(400).json({ error: "Bạn đã follow người này rồi!" });
     }
     await Follow.create({ follower_id, following_id });
+    await NotificationUser.create({
+      recipient_id: following_id,
+      sender_id: follower_id,
+      type: 'follow',
+      message: 'Bạn có người mới follow!'
+    });
     res.status(200).json({ message: "Follow thành công!" });
   }catch(error){
     res.status(500).json({ error: "Lỗi server", details: error.message });
@@ -549,6 +561,25 @@ const getFollowing  = async(req, res)=>{ // lấy ra người follow mình
   }
 }
 
+const getFollowNotification = async (req, res) =>{
+    try{
+        const userId = req.user.id
+        const notificationUser = await NotificationUser.findAll({
+          where:{recipient_id: userId},
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['user_id', 'username', 'avatar_url'] // Lấy thông tin user
+            }
+          ],
+          order : [['createdAt', 'DESC']]
+        })
+        res.status(200).json({notificationUser});
+    }catch(error){
+    res.status(500).json({ error: "Lỗi server", details: error.message });
+  }
+}
 const CreateCommentVideo = async (req, res) =>{
   try{
       const user_id = req.user.id;
@@ -650,47 +681,169 @@ const verifyPurchase = async (req, res) => {
   }
 }
 
-const storage  = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '../uploads')); 
-  },
-  filename: function (req, file, cb) {
-    // Đặt tên file theo timestamp + random number và phần mở rộng của file gốc
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
+const authFile = new google.auth.GoogleAuth({
+  keyFile: process.env.SERVICE_ACCOUNT_FILE,
+  scopes: ['https://www.googleapis.com/auth/drive'],
+})
+
+const drive = google.drive({
+  version: 'v3',
+  auth: authFile,
 });
-const upload = multer({ storage: storage });
-const uploadAvatar  = async (req, res)=>{
-  console.log('req.file:', req.file);
+
+const uploadAvatar = async(req, res)=>{
   try{
-    if(!req.file){
-      return res.status(400).json({ error: 'Không có file được upload' });
+    if (!req.file) {
+      return res.status(400).send('No file uploaded.');
     }
-    const baseUrl = process.env.BASE_URL;
-    const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
     const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ error: 'Chưa xác thực người dùng' });
     }
-    // Cập nhật avatar_url cho user trong MySQL
-    const updateResult = await User.update(
+    const folderId = process.env.YOUR_FOLDER_ID;
+    // Thiết lập metadata cho file trên Drive
+    const fileMetadata = {
+      //đặt tên file = tên gốc
+      name: req.file.originalname,
+      parents: [folderId],
+    };
+    const media = {
+      mimeType: req.file.mimetype,
+      body: streamifier.createReadStream(req.file.buffer),
+    };
+    const response = await drive.files.create({
+      requestBody: fileMetadata,
+      media: media,
+      fields: 'id, name',
+    });
+    const fileId = response.data.id;
+    const fileUrl = `https://drive.google.com/uc?id=${fileId}`;
+    await User.update(
       { avatar_url: fileUrl },
       { where: { id: userId } }
-    );
-    if (updateResult[0] === 0) {
-      return res.status(404).json({ error: 'Người dùng không tồn tại' });
-    }
+    )
     return res.status(200).json({
       message: 'Upload ảnh đại diện thành công',
-      avatar_url: fileUrl
+      avatar_url: fileUrl,
     });
   }catch (error) {
-    console.error('Lỗi upload ảnh đại diện:', error);
-    return res.status(500).json({ error: 'Lỗi máy chủ', details: error.message });
+    console.error('Error uploading file:', error);
+    throw error;
   }
 }
 
+  const uploadImagePost = async(req, res)=>{
+    try{
+      if (!req.file) {
+        return res.status(400).send('No file uploaded.');
+      }
+      const folderId = process.env.YOUR_FOLDER_ID;
+      // Thiết lập metadata cho file trên Drive
+      const fileMetadata = {
+        //đặt tên file = tên gốc
+        name: req.file.originalname,
+        parents: [folderId],
+      };
+      const media = {
+        mimeType: req.file.mimetype,
+        body: streamifier.createReadStream(req.file.buffer),
+      };
+      const response = await drive.files.create({
+        requestBody: fileMetadata,
+        media: media,
+        fields: 'id, name',
+      });
+      const fileId = response.data.id;
+      const fileUrl = `https://drive.google.com/uc?id=${fileId}`;
+      return res.status(200).json({
+        message: 'Upload ảnh thành công',
+        avatar_url: fileUrl,
+      });
+    }catch (error) {
+      console.error('Error uploading file:', error);
+      throw error;
+    }
+}
+const createSticker = async (req, res) => {
+  try {
+    const { sticker_url, title, category } = req.body;
+    if (!sticker_url) {
+      return res.status(400).json({ error: 'Sticker URL is required.' });
+    }
+    const sticker = await Sticker.create({
+      sticker_url,
+      title: title || null,
+      category: category || null,
+    });
+    return res.status(201).json(sticker);
+  } catch (error) {
+    console.error("Error creating sticker:", error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+const getSticker = async(req,res) =>{
+  try {
+    const stickers = await Sticker.findAll();
+    return res.status(200).json(stickers);
+  } catch (error) {
+    console.error('Error fetching stickers:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+const search = async(req,res) =>{
+  try{
+    const keyword = req.query.q
+    const type = req.query.type
+    if (!keyword) {
+      return res.status(400).json({ error: 'Tham số tìm kiếm không được để trống' });
+    }
+    if(type === 'user'){
+      const users = await User.findAll({
+        where: {
+          username: {
+            [Op.like]: `%${keyword}%`
+          }
+        },
+        attributes: ['id', 'username', 'avatar_url', 'slogan']
+      });
+      return res.status(200).json({ users });
+    }else if (type === 'song') {
+      const songs = await Song.findAll({
+        where: {
+          title: {
+            [Op.like]: `%${keyword}%`
+          }
+        },
+        attributes: ['id', 'title', 'subTitle', 'url_image', "audio_url", "lyrics", "artist_id" ]
+      });
+      return res.status(200).json({ songs });
+    }else{
+      const [users, songs] = await Promise.all([
+        User.findAll({
+          where: {
+            username: {
+              [Op.like]: `%${keyword}%`
+            }
+          },
+          attributes: ['id', 'username', 'avatar_url', 'slogan']
+      }),
+      Song.findAll({
+        where: {
+          title: {
+            [Op.like]: `%${keyword}%`
+          }
+        },
+        attributes: ['id', 'title', 'subTitle', 'url_image', "audio_url", "lyrics", "artist_id" ]
+      })
+      ]);
+    return res.status(200).json({ users, songs });
+    }
+  } catch (error) {
+    console.error("Error search:", error);
+    return res.status(500).json({ error: error.message });
+  }
+}
 
 module.exports = {
   register,
@@ -720,6 +873,10 @@ module.exports = {
   CreateCommentVideo,
   getCommentVideoList,
   verifyPurchase,
-  upload,
-  uploadAvatar
+  uploadAvatar,
+  uploadImagePost,
+  createSticker,
+  getSticker,
+  search,
+  getFollowNotification
 };

@@ -24,6 +24,7 @@
     "mysql2": "^3.13.0",
     "path": "^0.12.7",
     "sequelize": "^6.37.5",
-    "sequelize-cli": "^6.6.2"
+    "sequelize-cli": "^6.6.2",
+    "streamifier": "^0.1.1"
   }
 }
