@@ -15,8 +15,9 @@ const fs = require('fs');
 const streamifier = require('streamifier');
 const { google } = require('googleapis');
 const Sticker = require('../model/Sticker');
-const { Op } = require('sequelize');
+const { Op,literal, where } = require('sequelize');
 const NotificationUser = require('../model/NotificationUser');
+const FavoritePost = require('../model/FavoritesPost');
 
 
 const register = async (req, res) => {
@@ -144,12 +145,12 @@ const userProfile = async (req, res)=>{
     }else{
       const userInfo = await User.findOne({
         where :{id: userId},
-        attributes: ["user_id","username", "email", "slogan", "password", "phone", "date_of_birth", "gender", "avatar_url"]
+        attributes: ["user_id","username", "email", "slogan", "password", "phone", "date_of_birth", "gender", "avatar_url"],
       });
       if (!userInfo) {
         return res.status(404).json({ message: "Người dùng không tồn tại" }); // Nếu người dùng không tồn tại
       }
-      return res.status(200).json({userInfo})
+      return res.status(200).json(userInfo)
     }
 
   }catch(error){
@@ -232,7 +233,23 @@ const createRecordedSong = async(req, res) => {
 
 const getRecordedSongList = async(req, res) => {
   try{
+    const currentUserId = req.user.id;
+    const followings  = await Follow.findAll({
+      where:{follower_id: currentUserId},
+      attributes:['following_id']
+    })
+    const followingIds = followings.map(f => f.following_id);
     const record = await RecordedSong.findAll({
+      where:{
+        [Op.or]:[
+          {
+            user_id:{[Op.in]: followingIds}
+          },
+          where( literal(`(SELECT COUNT(*) FROM favorite_post WHERE favorite_post.post_id = RecordedSong.id)`),
+          { [Op.gt]: 5 }
+        )
+        ]
+      },
       attributes: [
         "id",
         "user_id",
@@ -241,10 +258,12 @@ const getRecordedSongList = async(req, res) => {
         "recording_path",
         "cover_image_url",
         "upload_time",
+        "comments_count",
         "likes_count",
         "status",
         // Đếm số lượng bình luận cho bài hát cụ thể
-        [sequelize.literal(`(SELECT COUNT(*) FROM Comments WHERE Comments.song_id = RecordedSong.id)`), "comments_count"]
+        [sequelize.literal(`(SELECT COUNT(*) FROM Comments WHERE Comments.song_id = RecordedSong.id)`), "comments_count"],
+        [sequelize.literal(`(SELECT COUNT(*) FROM favorite_post WHERE favorite_post.post_id = RecordedSong.id)`), "likes_count"]
     ],
       include: [
         {
@@ -265,7 +284,6 @@ const getRecordedSongList = async(req, res) => {
   }
 
 }
-
 const CreateComment = async (req, res) =>{
   try{
       const user_id = req.user.id;
@@ -580,6 +598,43 @@ const getFollowNotification = async (req, res) =>{
     res.status(500).json({ error: "Lỗi server", details: error.message });
   }
 }
+
+const unreadNotifications  = async (req, res) =>{
+  try{
+      const userId = req.user.id
+      const notificationUser = await NotificationUser.findAll({
+        where:{recipient_id: userId, is_read: false},
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['user_id', 'username', 'avatar_url'] // Lấy thông tin user
+          }
+        ],
+        order : [['createdAt', 'DESC']]
+      })
+      res.status(200).json({notificationUser});
+  }catch(error){
+  res.status(500).json({ error: "Lỗi server", details: error.message });
+}
+}
+
+const isReadNotification = async(req, res) =>{
+    try{
+        const userId = req.user.id
+        const { notificationId } = req.params;
+        const [updatedRows] = await NotificationUser.update(
+          {is_read: true},
+          {where:{id: notificationId, recipient_id: userId}},
+        )
+        if (updatedRows === 0) {
+          return res.status(404).json({ message: 'Notification not found or already read' });
+        }
+        res.status(200).json({ message: "Cập nhật thông báo đã đọc thành công" });
+    }catch(error){
+    res.status(500).json({ error: "Lỗi server", details: error.message });
+  }
+}
 const CreateCommentVideo = async (req, res) =>{
   try{
       const user_id = req.user.id;
@@ -845,6 +900,57 @@ const search = async(req,res) =>{
   }
 }
 
+const createIsFavoritePost = async(req, res) =>{
+  try{
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Bạn chưa đăng nhập" });
+    }
+    const user_id = req.user.id;
+    const {post_id} = req.body;
+    if (!post_id) {
+      return res.status(400).json({ message: "Thiếu post_id" });
+    }
+    const existingFavorite = await FavoritePost.findOne({where: {user_id:user_id, post_id:post_id}});
+    if(existingFavorite){
+      return res.status(200).json({ message: "Bài viết đã được yêu thích", favorite: existingFavorite });
+    }
+    const favorite = await FavoritePost.create({user_id: user_id, post_id: post_id})
+    return res.status(200).json(favorite);
+  }catch(error){
+    res.status(500).json({ error: "Lỗi server", details: error.message });
+  }
+}
+
+const removeIsFavoritePost = async(req, res)=>{
+  try {
+    const user_id = req.user.id;
+    const { post_id } = req.params;
+    const existingFavorite = await FavoritePost.findOne({ where: { user_id: user_id, post_id: post_id } });
+
+    if (!existingFavorite) {
+      return res.status(404).json({ message: "Bài viết chưa được yêu thích" });
+    }
+    const favorite = await FavoritePost.destroy({ where: { user_id: user_id, post_id: post_id } });
+    return res.status(200).json({ message: "Đã bỏ thích bài viết"});
+  }catch (error) {
+    return res.status(500).json({ error: "Lỗi server", details: error.message });
+  }
+}
+
+const getIsFavoritePostToSongID = async(req, res)=>{
+  try{
+    const user_id = req.user.id;
+    const postId = await FavoritePost.findAll({
+      where:{user_id},
+      attributes: ['post_id']
+    });
+    const postIdss = postId.map(fav => fav.post_id);
+    return res.status(200).json(postIdss);
+  }catch (error) {
+    return res.status(500).json({ error: "Lỗi server", details: error.message });
+  }
+}
+
 module.exports = {
   register,
   login,
@@ -878,5 +984,10 @@ module.exports = {
   createSticker,
   getSticker,
   search,
-  getFollowNotification
+  getFollowNotification,
+  isReadNotification,
+  unreadNotifications,
+  createIsFavoritePost,
+  removeIsFavoritePost,
+  getIsFavoritePostToSongID
 };

@@ -15,7 +15,7 @@ router.patch('/updateProfile',authenticateToken,UserController.updateProfile)// 
 router.patch('/users/update/:id',UserController.updateUser)
 router.get('/userProfile',authenticateToken,UserController.userProfile)
 router.post('/createRecordedSong',authenticateToken,UserController.createRecordedSong)
-router.get('/getRecordedSongList',UserController.getRecordedSongList)
+router.get('/getRecordedSongList',authenticateToken,UserController.getRecordedSongList)
 router.post('/createComment',authenticateToken,UserController.CreateComment)
 router.get('/getComments/:song_id',UserController.getCommentList)
 router.post('/createTopic', UserController.createTopic)
@@ -46,5 +46,11 @@ router.get('/stickers',UserController.getSticker)
 router.get('/search', UserController.search);
 
 router.get('/getFollowNotification', authenticateToken,UserController.getFollowNotification);
+router.get('/unreadNotifications', authenticateToken,UserController.unreadNotifications);
+router.patch("/readNotifications/:notificationId", authenticateToken,UserController.isReadNotification);
+
+router.post('/createIsFavoritePost',authenticateToken,UserController.createIsFavoritePost)
+router.delete('/removeIsFavoritePost/:post_id',authenticateToken, UserController.removeIsFavoritePost)
+router.get('/getIsFavoritePostToSongID',authenticateToken,UserController.getIsFavoritePostToSongID)
 
 module.exports = router;
