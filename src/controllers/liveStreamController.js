@@ -1,3 +1,4 @@
+const { User } = require("../model");
 const CommentLiveStream = require("../model/CommentLiveStream");
 const LiveStream = require("../model/LiveStream");
 
@@ -10,7 +11,6 @@ const createLiveStream = async(req, res) =>{
             message: 'Chưa có tiêu đề',
           });
     }
-
     const live = await LiveStream.create({
         host_user_id:host_user_id,
         title
@@ -26,13 +26,7 @@ const createLiveStream = async(req, res) =>{
 
 const updateLiveStream = async(req, res)=>{
     try{
-        const host_user_id = req.params.host_user_id
-        const{ status } = req.body 
-        if (!['active', 'ended'].includes(status)) {
-            return res.status(400).json({
-                message: 'Giá trị status không hợp lệ. Chỉ chấp nhận "active" hoặc "ended".',
-            });
-        }
+        const host_user_id = req.user.id
          // Kiểm tra xem bản ghi có tồn tại không
          const live = await LiveStream.findOne({
             where: { host_user_id: host_user_id },
@@ -43,9 +37,13 @@ const updateLiveStream = async(req, res)=>{
             });
         }
 
-        await live.update({ status, ended_at: status === 'ended' ? new Date() : null });
+        await LiveStream.update(
+            { status: 'ended' },
+            {where:{host_user_id: host_user_id}},
+           
+        );
         res.status(200).json({
-            message: `Cập nhật trạng thái buổi live thành công: ${status}.`,
+            message: `Cập nhật trạng thái buổi live thành công`,
         });
     }catch(error){
         return res.status(500).json({
@@ -57,10 +55,11 @@ const updateLiveStream = async(req, res)=>{
 
 const getLiveStream = async (req, res)=>{
     try{
-    const live = await LiveStream.findAll({
+    const live = await LiveStream.findOne({
         where : {
             status: 'active'
-        }
+        },
+        attributes:["stream_id","title","description","host_user_id","status", "participants_count"]
     })
     if (live.length === 0) {
         return res.status(404).json({ message: 'Không có ai live stream' });
@@ -76,8 +75,9 @@ const getLiveStream = async (req, res)=>{
 
 const createCommentLiveStream = async(req, res) =>{
     try{
-        const {stream_id, user_id, content} = req.body
-        if (!stream_id || !user_id || !content) {
+        const user_id = req.user.id
+        const {stream_id, comment_text , url_sticker, url_image} = req.body
+        if (!stream_id || !user_id || !comment_text && !url_sticker && !url_image) {
             return res.status(400).json({ message: 'Thiếu trường dữ liệu' });
         }
 
@@ -88,7 +88,9 @@ const createCommentLiveStream = async(req, res) =>{
         const newComment = await CommentLiveStream.create({
             stream_id,
             user_id,
-            content,
+            comment_text: comment_text || "",
+            url_sticker: url_sticker || null,
+            url_image: url_image || null,
         });
         res.status(201).json({
             message: 'Comment created successfully',
@@ -108,9 +110,17 @@ const getCommentsByStream  = async(req, res) =>{
         if (!stream_id) {
             return res.status(400).json({ message: 'thiếu tham số Stream_id ' });
         }
-        const comments   = await LiveStream.findAll({
-            where: { stream_id: stream_id },
-            order: [['created_at', 'ASC']],
+        const comments = await CommentLiveStream.findAll({
+            where: { stream_id: stream_id},
+            order: [['created_at', 'DESC']],
+            attributes:['live_comment_id','stream_id','user_id','comment_text' , 'url_sticker', 'url_image','status', 'created_at'],
+            include:[
+                {
+                    model: User,
+                    as: 'userCommentLive',
+                    attributes: ['user_id', 'username', 'avatar_url']
+                }
+            ]
         });
         if (comments.length === 0) {
             return res.status(404).json({ message: 'Không có bình luận nào trong buổi live' });

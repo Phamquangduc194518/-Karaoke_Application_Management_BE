@@ -52,6 +52,10 @@ User.init(
       type: DataTypes.ENUM("normal", "vip"), // Phân quyền tài khoản
       defaultValue: "normal",
     },
+    device_token: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     createdAt: {
       type: DataTypes.DATE,
       field: 'created_at', // Liên kết với cột `created_at`

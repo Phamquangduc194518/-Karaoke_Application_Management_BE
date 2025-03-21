@@ -15,9 +15,12 @@ const fs = require('fs');
 const streamifier = require('streamifier');
 const { google } = require('googleapis');
 const Sticker = require('../model/Sticker');
-const { Op,literal, where } = require('sequelize');
+const { Op, fn, col, literal, where } = require('sequelize');
 const NotificationUser = require('../model/NotificationUser');
 const FavoritePost = require('../model/FavoritesPost');
+const LiveStream = require('../model/LiveStream');
+const admin = require('firebase-admin');
+const serviceAccount = require('../../firebaseAdminSdk.json');
 
 
 const register = async (req, res) => {
@@ -288,7 +291,6 @@ const CreateComment = async (req, res) =>{
   try{
       const user_id = req.user.id;
       const {song_id, comment_text, url_sticker, url_image} = req.body;
-
       if(!song_id && !comment_text && !url_sticker && !url_image){
         return res.status(400).json({
           message: 'Chưa bình luận',
@@ -427,7 +429,7 @@ const getIsFavorite = async(req, res)=>{
       include:[
         {
           model: Song,
-          attributes: ["title", "subTitle", "url_image"],
+          attributes: ["title", "subTitle", "url_image", "lyrics", "audio_url", "url_image"],
         },
       ],
     });
@@ -487,6 +489,12 @@ const followUser = async(req, res) =>{
       type: 'follow',
       message: 'Bạn có người mới follow!'
     });
+    const recipient = await User.findOne({ where: { id: following_id } });
+    const follower = await User.findOne({ where: { id: follower_id } });
+    const followerName = follower ? follower.username : "Một người nào đó";
+    if (recipient && recipient.device_token) {
+      sendFollowNotification(recipient.device_token, followerName);
+    }
     res.status(200).json({ message: "Follow thành công!" });
   }catch(error){
     res.status(500).json({ error: "Lỗi server", details: error.message });
@@ -638,9 +646,9 @@ const isReadNotification = async(req, res) =>{
 const CreateCommentVideo = async (req, res) =>{
   try{
       const user_id = req.user.id;
-      const {video_id, comment_text} = req.body;
+      const {video_id, comment_text, url_sticker, url_image} = req.body;
 
-      if(!comment_text || !video_id){
+      if(!video_id && !comment_text && !url_sticker && !url_image){
         return res.status(400).json({
           message: 'Chưa bình luận',
         });
@@ -649,7 +657,9 @@ const CreateCommentVideo = async (req, res) =>{
       const comment = await CommentsVideo.create({
         user_id,
         video_id,
-        comment_text
+        comment_text: comment_text || "",
+        url_sticker: url_sticker || null,
+        url_image: url_image || null,
       });
       return res.status(201).json(comment);
   }catch(error){
@@ -706,19 +716,25 @@ const verifyPurchase = async (req, res) => {
     });
     const purchaseInfo = result.data;
     console.log('Purchase info:', purchaseInfo);
-    if (purchaseInfo.purchaseState !== 0) {
+    if (purchaseInfo.paymentState !== 1) {
       return res.status(400).json({ error: 'Giao dịch không hợp lệ' });
     }
     const user = await User.findOne({ where: { id: user_id } });
     if (!user) {
       return res.status(404).json({ error: 'Người dùng không tồn tại' });
     }
+    const existingToken = await Subscription.findOne({ where: { purchaseToken: purchaseToken } });
+    const tokenUserId = Number(existingToken.get('userId'));
+    const requestUserId = Number(user_id);
+    if (tokenUserId !== requestUserId) {
+      return res.status(200).json({ success: false, message: 'Token đã được sử dụng bởi tài khoản khác' });
+    }
     let subscription = await Subscription.findOne({ where: { userId: user_id } });
     if(subscription){
       subscription.purchaseToken= purchaseToken
       subscription.orderId = purchaseInfo.orderId;
       subscription.expiryTime = purchaseInfo.expiryTimeMillis;
-      subscription.purchaseState = purchaseInfo.purchaseState;
+      subscription.paymentState = purchaseInfo.paymentState;
       await subscription.save();
     }else{
       subscription = await Subscription.create({
@@ -726,10 +742,12 @@ const verifyPurchase = async (req, res) => {
         purchaseToken: purchaseToken,
         orderId: purchaseInfo.orderId,
         expiryTime: purchaseInfo.expiryTimeMillis,
-        purchaseState: purchaseInfo.purchaseState,
+        paymentState: purchaseInfo.paymentState,
       });
     }
-    return res.status(200).json({ success: true, subscription });
+    user.role = 'vip';
+    await user.save();
+    return res.status(200).json({ success: true});
   }catch (err) {
     console.error('Lỗi xác minh giao dịch:', err);
     return res.status(500).json({ error: 'Xác minh giao dịch thất bại', details: err.message });
@@ -951,6 +969,74 @@ const getIsFavoritePostToSongID = async(req, res)=>{
   }
 }
 
+const getStarAccount = async(req, res) =>{
+  try{
+      const account = await Follow.findAll({
+        attributes:[
+          'following_id',
+          [fn('COUNT', col('follower_id')), 'followersCount']
+        ],
+        group: ['following_id'],
+        having: where(fn('COUNT', col('follower_id')), '>', 2),
+        include: [
+          {
+            model: User,
+            as: 'following',
+            attributes: ['user_id', 'username', 'avatar_url'],
+            include:[
+              {
+                model: LiveStream, 
+                as: 'liveStream', 
+                where: { status: 'active' },
+                required: false, 
+                attributes: ['stream_id', 'title', 'status']
+              }
+            ]
+          }
+        ]
+      });
+      return res.status(200).json(account);
+  }catch (error) {
+    return res.status(500).json({ error: "Lỗi server", details: error.message });
+  }
+}
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const updateDeviceToken = async (req,res)=>{
+  const userId = req.user.id
+  const { deviceToken } = req.body;
+  try {
+    await User.update(
+      { device_token: deviceToken }, 
+      {where:{user_id:userId}},
+    );
+    res.status(200).json({ message: "Cập nhật token thành công" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Lỗi cập nhật token" });
+  }
+}
+
+function sendFollowNotification(deviceToken, followerName){
+    const message  = {
+      notification: {
+        title: 'Có người theo dõi bạn',
+        body: `${followerName} đã theo dõi bạn.`
+      },
+      token: deviceToken
+    }
+    admin.messaging().send(message)
+    .then((response) => {
+      console.log("Thông báo đã được gửi thành công:", response);
+    })
+    .catch((error) => {
+      console.error("Lỗi khi gửi thông báo:", error);
+    });
+}
+
 module.exports = {
   register,
   login,
@@ -989,5 +1075,7 @@ module.exports = {
   unreadNotifications,
   createIsFavoritePost,
   removeIsFavoritePost,
-  getIsFavoritePostToSongID
+  getIsFavoritePostToSongID,
+  getStarAccount,
+  updateDeviceToken
 };

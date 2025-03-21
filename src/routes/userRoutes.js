@@ -23,7 +23,7 @@ router.get('/getAllTopicsWithVideo',UserController.getAllTopicsWithVideo)
 router.post('/createVideoOfTopic', UserController.createVideoOfTopic)
 router.post('/createIsFavorite',authenticateToken,UserController.createIsFavorite)
 router.delete('/removeIsFavorite/:song_id',authenticateToken, UserController.removeIsFavorite)
-router.get('/getIsFavorite',authenticateToken,UserController.getIsFavorite)
+router.get('/getIsFavorite',authenticateToken,UserController.getIsFavorite) 
 router.get('/getIsFavoriteToSongID',authenticateToken,UserController.getIsFavoriteToSongID)
 router.get('/getUserProfile/:user_id',authenticateToken,UserController.getUserProfile)
 
@@ -52,5 +52,8 @@ router.patch("/readNotifications/:notificationId", authenticateToken,UserControl
 router.post('/createIsFavoritePost',authenticateToken,UserController.createIsFavoritePost)
 router.delete('/removeIsFavoritePost/:post_id',authenticateToken, UserController.removeIsFavoritePost)
 router.get('/getIsFavoritePostToSongID',authenticateToken,UserController.getIsFavoritePostToSongID)
+router.get('/getStarAccount',UserController.getStarAccount)
+
+router.post('/updateDeviceToken',authenticateToken,UserController.updateDeviceToken) 
 
 module.exports = router;

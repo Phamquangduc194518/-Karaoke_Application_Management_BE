@@ -56,3 +56,4 @@ yarn.lock
 build/Release
 src/config/keys/
 serviceAccountKey.json
+firebaseAdminSdk.json

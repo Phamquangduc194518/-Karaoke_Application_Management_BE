@@ -32,10 +32,18 @@ CommentLiveStream.init({
         onDelete: 'CASCADE', 
         onUpdate: 'CASCADE', 
     },
-    content:{
-        type: DataTypes.STRING,
-        allowNull : false,
-    },
+    comment_text: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
+    url_sticker: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+    url_image: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
     status:{
         type: DataTypes.ENUM('public', 'private'),
         defaultValue: 'public'
@@ -49,6 +57,7 @@ CommentLiveStream.init({
     sequelize,
     modelName: 'CommentLiveStream',
     tableName: 'comment_live_stream',
+    timestamps: true,
 }
 );
 

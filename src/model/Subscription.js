@@ -21,7 +21,6 @@ Subscription.init(
     purchaseToken: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
     },
     orderId: {
       type: DataTypes.STRING,
@@ -30,11 +29,6 @@ Subscription.init(
     expiryTime: {
       type: DataTypes.BIGINT,
       allowNull: true,
-    },
-    purchaseState: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      // Ví dụ: 0 = PURCHASED, 1 = CANCELED, 2 = PENDING
     },
     createdAt: {
       type: DataTypes.DATE,

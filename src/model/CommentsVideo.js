@@ -35,6 +35,14 @@ CommentsVideo.init(
             type: DataTypes.TEXT,
             allowNull: false,
           },
+        url_sticker: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+          },
+        url_image: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+          },
         comment_time: {
             type: DataTypes.DATE,
             defaultValue: DataTypes.NOW,

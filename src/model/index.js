@@ -8,6 +8,8 @@ const Follow = require('./Follow');
 const Video = require('./Video')
 const CommentsVideo = require('./CommentsVideo');
 const NotificationUser = require('./NotificationUser');
+const LiveStream = require('./LiveStream');
+const CommentLiveStream = require('./CommentLiveStream');
 
 // Thiết lập quan hệ giữa các model
 
@@ -50,6 +52,11 @@ CommentsVideo.belongsTo(User,{foreignKey:'user_id', as: 'user'})
 
 NotificationUser.belongsTo(User, { foreignKey: 'sender_id', as: 'user' });
 
+User.hasOne(LiveStream, { foreignKey: 'host_user_id', as: 'liveStream' });
+LiveStream.belongsTo(User, { foreignKey: 'host_user_id', as: 'host' });
+
+CommentLiveStream.belongsTo(User, { foreignKey: 'user_id', as: 'userCommentLive'})
+User.hasMany(CommentLiveStream,{foreignKey: 'user_id',as: 'comments'})
 // Export các model
 module.exports = {
   User,
