@@ -4,6 +4,7 @@ const router = express.Router();
 const UserController = require('../controllers/userController')
 const { authenticateToken, authorizeRole } = require('../authMiddleware');
 const multer = require('multer');
+const { route } = require('./adminRoute');
 // Sử dụng memory storage: file sẽ được lưu trong req.file.buffer
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
@@ -11,6 +12,7 @@ const upload = multer({ storage: storage });
 router.post('/register', UserController.register);
 router.post('/login', UserController.login);
 router.post('/logout',authenticateToken,UserController.logout);
+router.post('/forgotPassword', UserController.forgotPassword)
 router.patch('/updateProfile',authenticateToken,UserController.updateProfile)// update của người dùng
 router.patch('/users/update/:id',UserController.updateUser)
 router.get('/userProfile',authenticateToken,UserController.userProfile)
@@ -36,7 +38,7 @@ router.get("/following/:user_id", UserController.getFollowing);
 router.post('/CreateCommentVideo',authenticateToken,UserController.CreateCommentVideo)
 router.get('/getCommentVideoList/:video_id',UserController.getCommentVideoList)
 
-router.post('/verifyPurchase', UserController.verifyPurchase);
+router.post('/verifyPurchase',UserController.verifyPurchase);
 router.post('/uploadAvatar',authenticateToken,upload.single('image'),UserController.uploadAvatar);
 router.post('/uploadImagePost',upload.single('image'),UserController.uploadImagePost)
 
@@ -55,5 +57,6 @@ router.get('/getIsFavoritePostToSongID',authenticateToken,UserController.getIsFa
 router.get('/getStarAccount',UserController.getStarAccount)
 
 router.post('/updateDeviceToken',authenticateToken,UserController.updateDeviceToken) 
-
+router.post('/SongRequestFromUser', authenticateToken, UserController.SongRequestFromUser)
+router.get('/getSongRequestFromUser', UserController.getSongRequestFromUser)
 module.exports = router;

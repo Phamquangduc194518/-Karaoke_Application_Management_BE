@@ -22,6 +22,7 @@
     "karaoke_backend": "file:",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.13.0",
+    "nodemailer": "^6.10.0",
     "path": "^0.12.7",
     "sequelize": "^6.37.5",
     "sequelize-cli": "^6.6.2",

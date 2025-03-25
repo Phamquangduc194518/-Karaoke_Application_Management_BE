@@ -21,6 +21,9 @@ const FavoritePost = require('../model/FavoritesPost');
 const LiveStream = require('../model/LiveStream');
 const admin = require('firebase-admin');
 const serviceAccount = require('../../firebaseAdminSdk.json');
+const RequestFromUser = require('../model/RequestFromUser');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 
 const register = async (req, res) => {
@@ -108,6 +111,54 @@ const login = async (req, res) => {
   }
 };
 
+const forgotPassword = async (req,res) =>{
+  try{
+   const {email} = req.body
+   if (!email) {
+    return res.status(400).json({ message: "Vui lòng nhập email." });
+  }
+   const userToEmail = await User.findOne(
+    {
+      where:{email: email} 
+    }
+   )
+   if(!userToEmail){
+    return res.status(400).json({ message: "Email không tồn tại." });
+   }
+   const randomPassword  = crypto.randomBytes(4).toString('hex');
+   const hashedPassword = await bcrypt.hash(randomPassword, 10);
+   userToEmail.password = hashedPassword;
+   await userToEmail.save();
+   let transporter = nodemailer.createTransport({
+    service: 'Gmail',
+    auth: {
+      user: process.env.YOUR_ACCOUNT_EMAIL,        
+      pass: process.env.YOUR_ACCOUNT_EMAIL_PASSWORD             
+    }
+   });
+   const mailOptions = {
+    from: '"Karaoke App" <no-reply@yourdomain.com>',
+    to: email,
+    subject: 'Đặt lại mật khẩu của bạn',
+    text: `Mật khẩu mới của bạn là: ${randomPassword}. Hãy đăng nhập và đổi lại mật khẩu ngay.`,
+    html: `
+        <p>Mật khẩu mới của bạn là: <strong>${randomPassword}</strong></p>
+        <p>Hãy đăng nhập và đổi lại mật khẩu ngay.</p>
+      `
+   };
+
+    transporter.sendMail(mailOptions, (error, info) =>{
+    if (error) {
+      console.error("Lỗi gửi email:", error);
+      return res.status(500).json({ message: "Lỗi gửi email, vui lòng thử lại sau." });
+    }
+    return res.status(200).json({ message: "Email đặt lại mật khẩu đã được gửi, vui lòng kiểm tra email của bạn." });
+   })
+  }catch(error){
+    console.error("Lỗi trong quá trình forgotPassword:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ, vui lòng thử lại sau." });
+  }
+}
 const updateProfile = async (req, res)=>{
 
   const userId = req.user.id// Lấy từ JWT
@@ -148,7 +199,7 @@ const userProfile = async (req, res)=>{
     }else{
       const userInfo = await User.findOne({
         where :{id: userId},
-        attributes: ["user_id","username", "email", "slogan", "password", "phone", "date_of_birth", "gender", "avatar_url"],
+        attributes: ["user_id","username", "email", "slogan", "password", "phone", "date_of_birth", "gender", "avatar_url", "role"],
       });
       if (!userInfo) {
         return res.status(404).json({ message: "Người dùng không tồn tại" }); // Nếu người dùng không tồn tại
@@ -247,6 +298,9 @@ const getRecordedSongList = async(req, res) => {
         [Op.or]:[
           {
             user_id:{[Op.in]: followingIds}
+          },
+          {
+             user_id: currentUserId , 
           },
           where( literal(`(SELECT COUNT(*) FROM favorite_post WHERE favorite_post.post_id = RecordedSong.id)`),
           { [Op.gt]: 5 }
@@ -715,7 +769,6 @@ const verifyPurchase = async (req, res) => {
       token: purchaseToken,
     });
     const purchaseInfo = result.data;
-    console.log('Purchase info:', purchaseInfo);
     if (purchaseInfo.paymentState !== 1) {
       return res.status(400).json({ error: 'Giao dịch không hợp lệ' });
     }
@@ -724,10 +777,12 @@ const verifyPurchase = async (req, res) => {
       return res.status(404).json({ error: 'Người dùng không tồn tại' });
     }
     const existingToken = await Subscription.findOne({ where: { purchaseToken: purchaseToken } });
+    if(existingToken){
     const tokenUserId = Number(existingToken.get('userId'));
     const requestUserId = Number(user_id);
     if (tokenUserId !== requestUserId) {
       return res.status(200).json({ success: false, message: 'Token đã được sử dụng bởi tài khoản khác' });
+      }
     }
     let subscription = await Subscription.findOne({ where: { userId: user_id } });
     if(subscription){
@@ -744,6 +799,7 @@ const verifyPurchase = async (req, res) => {
         expiryTime: purchaseInfo.expiryTimeMillis,
         paymentState: purchaseInfo.paymentState,
       });
+      console.log("check vip",subscription)
     }
     user.role = 'vip';
     await user.save();
@@ -1037,6 +1093,47 @@ function sendFollowNotification(deviceToken, followerName){
     });
 }
 
+const SongRequestFromUser = async (req,res) =>{
+  try{
+      const user_id= req.user.id
+      if(!user_id){
+        return res.status(400).json({ message: "Không tồn tại người dùng" });
+      }
+      const {title, content, contactInformation} = req.body 
+      if(!title || !content || !contactInformation){
+        return res.status(400).json({ message: "Thiếu dữ liệu" });
+      }
+      const requestFromUser = await RequestFromUser.create({
+        user_id: user_id,
+        title: title,
+        content: content,
+        contactInformation: contactInformation
+      })
+      return res.status(200).json({ message: "Gửi yêu cầu thành công" })
+  }catch (error){
+    return res.status(500).json({ error: "Lỗi server", details: error.message });
+  }
+}
+
+const getSongRequestFromUser = async(req,res)=>{
+  try{
+      const requestFromUser = await RequestFromUser.findAll({
+        order: [['createdAt', 'DESC']],
+        attributes:['title','content','contactInformation', 'status'],
+        include: [
+          {
+            model: User,
+            as: 'requestUser',
+            attributes: ['user_id', 'username', 'avatar_url']
+          }
+        ]
+      });
+      return res.status(200).json(requestFromUser);
+  }catch (error){
+    return res.status(500).json({ error: "Lỗi server", details: error.message });
+  }
+}
+
 module.exports = {
   register,
   login,
@@ -1077,5 +1174,8 @@ module.exports = {
   removeIsFavoritePost,
   getIsFavoritePostToSongID,
   getStarAccount,
-  updateDeviceToken
+  updateDeviceToken,
+  SongRequestFromUser,
+  getSongRequestFromUser,
+  forgotPassword
 };
