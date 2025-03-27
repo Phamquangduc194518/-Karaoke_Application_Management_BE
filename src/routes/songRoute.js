@@ -5,6 +5,7 @@ const { authenticateToken, authorizeRole } = require('../authMiddleware');
 
 router.post('/createSong',songController.createSong);
 router.get('/getSong',authenticateToken, songController.getSong);
+router.get('/getSongAdmin', songController.getSongAdmin);
 router.post('/createArtist', songController.createArtist)
 router.patch('/updateArtist/:id', songController.updateArtist)
 router.delete('/deleteArtist', songController.deleteArtist)

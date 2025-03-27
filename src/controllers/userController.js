@@ -285,26 +285,74 @@ const createRecordedSong = async(req, res) => {
 
 }
 
-const getRecordedSongList = async(req, res) => {
+const removeRecordedSong = async(req,res) =>{
   try{
+    const songPostId = req.params.songPostId
+    await FavoritePost.destroy({ where: { post_id: songPostId } });
+    const deleted = await RecordedSong.destroy({
+      where: { id: songPostId }
+    });
+    if (deleted === 0) {
+      return res.status(404).json({ message: "Không tìm thấy bài ghi âm để xoá" });
+    }
+    return res.status(200).json({ message: "Đã xoá bài ghi âm thành công" });
+  }catch (error) {
+    console.error("Lỗi không xáo được:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ", error: error.message });
+  }
+}
+
+const getRecordedSongList = async (req, res) => {
+  try {
     const currentUserId = req.user.id;
-    const followings  = await Follow.findAll({
-      where:{follower_id: currentUserId},
-      attributes:['following_id']
-    })
+
+    // ✅ Cập nhật likes_count
+    await sequelize.query(`
+      UPDATE RecordedSong rs
+      LEFT JOIN (
+        SELECT post_id, COUNT(*) as like_count
+        FROM favorite_post
+        GROUP BY post_id
+      ) AS f ON rs.id = f.post_id
+      SET rs.likes_count = IFNULL(f.like_count, 0)
+    `, { type: sequelize.QueryTypes.UPDATE });
+
+    // ✅ Cập nhật comments_count
+    await sequelize.query(`
+      UPDATE RecordedSong rs
+      LEFT JOIN (
+        SELECT song_id, COUNT(*) as comment_count
+        FROM comments
+        GROUP BY song_id
+      ) AS c ON rs.id = c.song_id
+      SET rs.comments_count = IFNULL(c.comment_count, 0)
+    `, { type: sequelize.QueryTypes.UPDATE });
+
+    // ✅ Lấy danh sách user mà current user đang follow
+    const followings = await Follow.findAll({
+      where: { follower_id: currentUserId },
+      attributes: ['following_id']
+    });
     const followingIds = followings.map(f => f.following_id);
+
+    // Truy vấn bài hát thỏa 3 điều kiện
     const record = await RecordedSong.findAll({
-      where:{
-        [Op.or]:[
-          {
-            user_id:{[Op.in]: followingIds}
+      where: {
+        [Op.or]: [
+          { 
+            [Op.and]: [
+            {user_id: { [Op.in]: followingIds }},
+            { status: "public" }
+            ]
           },
+          { user_id: currentUserId },
           {
-             user_id: currentUserId , 
-          },
-          where( literal(`(SELECT COUNT(*) FROM favorite_post WHERE favorite_post.post_id = RecordedSong.id)`),
-          { [Op.gt]: 5 }
-        )
+            [Op.and]:[
+               sequelize.literal('likes_count > 5'), // ✅ đúng cú pháp
+               { status: "public" }
+            ]
+           
+          }
         ]
       },
       attributes: [
@@ -317,29 +365,62 @@ const getRecordedSongList = async(req, res) => {
         "upload_time",
         "comments_count",
         "likes_count",
-        "status",
-        // Đếm số lượng bình luận cho bài hát cụ thể
-        [sequelize.literal(`(SELECT COUNT(*) FROM Comments WHERE Comments.song_id = RecordedSong.id)`), "comments_count"],
-        [sequelize.literal(`(SELECT COUNT(*) FROM favorite_post WHERE favorite_post.post_id = RecordedSong.id)`), "likes_count"]
-    ],
+        "status"
+      ],
       include: [
         {
           model: User,
           as: 'user',
-          attributes: ['user_id', 'username', 'avatar_url'] // Lấy thông tin user
+          attributes: ['user_id', 'username', 'avatar_url']
         }
       ],
       order: [["upload_time", "DESC"]]
     });
+
     if (!record || record.length === 0) {
       return res.status(404).json({ message: "Không có bản ghi nào" });
+    }
+
+    return res.status(200).json(record);
+  } catch (error) {
+    console.error("Lỗi lấy danh sách bài hát:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ", error: error.message });
   }
-    return res.status(200).json(record) 
+};
+
+const makeSongPublic = async(req,res) =>{
+  try{
+      const songPostId = req.params.songPostId
+      const { status } = req.body;
+      if(!["public","private"].includes(status)){
+        return res.status(400).json({ message: "Trạng thái không hợp lệ" });
+      }
+      const [updated] = await RecordedSong.update(
+        { status: status },
+        { where: { id: songPostId } }
+      );
+      if (updated === 0) {
+        return res.status(404).json({ message: "Không tìm thấy bài hát để cập nhật" });
+      }
+      return res.status(200).json({ message: `Đã cập nhật trạng thái bài hát thành ${status}` });
+  }catch (error) {
+    console.error("Lỗi lấy danh sách bài hát:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ", error: error.message });
+  }
+}
+
+const getRecordedSongOfUser = async(req,res) =>{
+  try{
+    const user_id = req.user.id;
+    const recordedSong = await RecordedSong.findAll({
+      where:{user_id: user_id},
+      order: [['upload_time', 'DESC']]
+  })
+    return res.status(200).json(recordedSong) 
   }catch(error){
     console.error("Lỗi lấy danh sách bài hát:", error);
     return res.status(500).json({ message: "Lỗi máy chủ", error: error.message });
   }
-
 }
 const CreateComment = async (req, res) =>{
   try{
@@ -1177,5 +1258,8 @@ module.exports = {
   updateDeviceToken,
   SongRequestFromUser,
   getSongRequestFromUser,
-  forgotPassword
+  forgotPassword,
+  getRecordedSongOfUser,
+  makeSongPublic,
+  removeRecordedSong
 };

@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const Admin = require('../model/Admin'); // Sử dụng model Admin
+const jwt = require('jsonwebtoken');
 
 const loginAdmin = async (req, res) => {
   const { email, password } = req.body;
@@ -18,10 +19,17 @@ const loginAdmin = async (req, res) => {
       return res.status(401).json({ errCode: 2, message: 'Invalid password!' });
     }
 
+    const token = jwt.sign(
+      { email: admin.email},
+      process.env.JWT_SECRET, // Khóa bí mật
+      { expiresIn: '1h' } // Token hết hạn sau 1 giờ
+    )
+
     return res.status(200).json({
       errCode: 0,
       message: 'Login successful!',
-      user: { id: admin.id, email: admin.email },
+      token: token,
+      user: {email: admin.email },
     });
   } catch (error) {
     console.error('Error during admin login:', error);

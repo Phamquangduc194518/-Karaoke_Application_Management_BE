@@ -49,6 +49,16 @@ const getSong = async(req, res)=>{
     }
 };
 
+const getSongAdmin = async(req, res)=>{
+    try{
+        const song = await Song.findAll()
+        res.status(200).json(song)
+    }catch(error){
+        console.error('Error fetching songs:', error);
+        res.status(500).send({ message: 'Failed to fetch songs', error: error.message });
+    }
+};
+
 const createArtist = async (req, res)=>{
     const {name, bio, avatar_url} = req.body
     try{
@@ -357,5 +367,6 @@ module.exports={
     addSongToAlbum,
     removeSongFromAlbum,
     getSongsByAlbum,
-    getTopSong
+    getTopSong,
+    getSongAdmin
 }

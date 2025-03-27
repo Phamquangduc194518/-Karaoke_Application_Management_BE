@@ -27,6 +27,7 @@ FavoritePost.init(
         model: RecordedSong,  
         key: 'id',
       },
+      onDelete: 'CASCADE',
     },
   },
   {
