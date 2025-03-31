@@ -11,6 +11,7 @@ const NotificationUser = require('./NotificationUser');
 const LiveStream = require('./LiveStream');
 const CommentLiveStream = require('./CommentLiveStream');
 const RequestFromUser = require('./RequestFromUser');
+const Replies = require('./Replies');
 
 // Thiết lập quan hệ giữa các model
 
@@ -61,6 +62,11 @@ User.hasMany(CommentLiveStream,{foreignKey: 'user_id',as: 'comments'})
 
 User.hasMany(RequestFromUser,{foreignKey: 'user_id', as: 'userRequest'})
 RequestFromUser.belongsTo(User, { foreignKey: 'user_id', as: 'requestUser' });
+
+RequestFromUser.hasMany(Replies, { foreignKey: 'request_id', as: 'replies'});
+Replies.belongsTo(RequestFromUser, { foreignKey: 'request_id', as: 'replie' });
+
+
 // Export các model
 module.exports = {
   User,
@@ -72,5 +78,7 @@ module.exports = {
   Follow,
   Video,
   CommentsVideo,
-  RequestFromUser
+  RequestFromUser,
+  Replies,
+  AlbumSong
 };

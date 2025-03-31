@@ -22,8 +22,8 @@ RequestFromUser.init(
             onUpdate: 'CASCADE', 
         },
         title: {
-            type: DataTypes.STRING,
-            allowNull: false,
+            type: DataTypes.ENUM('Khiếu nại','yêu cầu bài hát mới','Đóng góp ý kiến'),
+            defaultValue: "Đóng góp ý kiến",
         },
         content: {
             type: DataTypes.STRING,
@@ -34,9 +34,12 @@ RequestFromUser.init(
             allowNull: false,
         },
         status: {
-            type: DataTypes.TINYINT,
-            defaultValue: 0,
-            allowNull: false,
+            type: DataTypes.ENUM('new', 'pending', 'resolved'),
+            defaultValue: 'new',
+        },
+        priority: {
+            type: DataTypes.ENUM('low', 'medium', 'high'),
+            defaultValue: 'medium',
         },
     },
     {

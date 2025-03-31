@@ -4,6 +4,7 @@ const songController = require('../controllers/songController')
 const { authenticateToken, authorizeRole } = require('../authMiddleware');
 
 router.post('/createSong',songController.createSong);
+router.delete('/deleteSong',songController.deleteSong);
 router.get('/getSong',authenticateToken, songController.getSong);
 router.get('/getSongAdmin', songController.getSongAdmin);
 router.post('/createArtist', songController.createArtist)

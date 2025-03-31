@@ -517,6 +517,26 @@ const getAllTopicsWithVideo = async(req, res) =>{
  }
 }
 
+const getAllTopicsWithVideoOfAdmin = async(req, res) =>{
+  try{
+      const topics = await Topic.findAll(
+        {
+          include:[
+            {
+              model: Video,
+              as: 'videos',
+              attributes:["id", "topicId","title","url","thumbnail"]
+            },
+          ],
+          order: [['id','DESC']]
+        }
+      );
+      return res.status(200).json(topics);
+  }catch(error) {
+      res.status(500).json({ error: "Lỗi server", details: error.message });
+ }
+}
+
 const createIsFavorite = async(req, res) =>{
   try{
     if (!req.user || !req.user.id) {
@@ -1184,37 +1204,29 @@ const SongRequestFromUser = async (req,res) =>{
       if(!title || !content || !contactInformation){
         return res.status(400).json({ message: "Thiếu dữ liệu" });
       }
+      let priority = 'medium';
+      if(title === 'Khiếu nại'){
+        priority = 'high';
+      }else if (title === 'yêu cầu bài hát mới') {
+        priority = 'low';
+      }else if(title === 'Đóng góp ý kiến'){
+        priority = 'medium'
+      }else{
+        priority = 'medium'
+      }
       const requestFromUser = await RequestFromUser.create({
         user_id: user_id,
         title: title,
         content: content,
-        contactInformation: contactInformation
+        contactInformation: contactInformation,
+        priority,
+        status: 'new',
       })
       return res.status(200).json({ message: "Gửi yêu cầu thành công" })
   }catch (error){
     return res.status(500).json({ error: "Lỗi server", details: error.message });
   }
 }
-
-const getSongRequestFromUser = async(req,res)=>{
-  try{
-      const requestFromUser = await RequestFromUser.findAll({
-        order: [['createdAt', 'DESC']],
-        attributes:['title','content','contactInformation', 'status'],
-        include: [
-          {
-            model: User,
-            as: 'requestUser',
-            attributes: ['user_id', 'username', 'avatar_url']
-          }
-        ]
-      });
-      return res.status(200).json(requestFromUser);
-  }catch (error){
-    return res.status(500).json({ error: "Lỗi server", details: error.message });
-  }
-}
-
 module.exports = {
   register,
   login,
@@ -1257,9 +1269,9 @@ module.exports = {
   getStarAccount,
   updateDeviceToken,
   SongRequestFromUser,
-  getSongRequestFromUser,
   forgotPassword,
   getRecordedSongOfUser,
   makeSongPublic,
-  removeRecordedSong
+  removeRecordedSong,
+  getAllTopicsWithVideoOfAdmin
 };

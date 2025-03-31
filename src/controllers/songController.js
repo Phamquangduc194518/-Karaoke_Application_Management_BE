@@ -5,9 +5,9 @@ const Lyrics = require('../model/DuetLyrics');
 const sequelize = require('../config/database');
 
 const createSong = async(req, res) => {
-    const {title, subTitle, artist_id, genre, lyrics, audio_url, url_image} = req.body
+    const {title, subTitle, artist_id, genre, lyrics, audio_url, url_image, is_duet,vip_required,} = req.body
         try{ 
-        if (!title || !artist_id || !audio_url || !url_image) {
+        if (!title || !artist_id || !url_image) {
           return res.status(400).send({ message: 'Title, artist, and audio URL are required' });
         }
           const newSong = await Song.create({
@@ -18,12 +18,32 @@ const createSong = async(req, res) => {
             lyrics,
             audio_url,
             url_image,
+            is_duet: is_duet === 'true' || is_duet === true,
+            vip_required: vip_required === 'true' || vip_required === true,
         });
             res.status(201).send({message: 'Tạo bài hát thành công', newSong});
         }catch(error){
             res.status(500).send("Lưu bài hát gặp sự cố")
         };
     };
+
+const deleteSong = async (req, res) =>{
+    try{
+        const {song_id} = req.body
+        if (!song_id) {
+            return res.status(400).send({ message: "Song ID is required" });
+          }
+        const deleted = await Song.destroy({
+            where: { id: song_id }
+          });
+          if (!deleted) {
+            return res.status(404).send({ message: "Không tìm thấy bài hát" });
+          }
+        res.status(201).send({message: 'Xóa bài hát thành công'});
+    }catch(error){
+        res.status(500).send("Lưu bài hát gặp sự cố")
+    }
+}
 
 const getSong = async(req, res)=>{
     const userRole = req.user.role
@@ -51,7 +71,25 @@ const getSong = async(req, res)=>{
 
 const getSongAdmin = async(req, res)=>{
     try{
-        const song = await Song.findAll()
+        const song = await Song.findAll({
+            attributes:["id","title", "subTitle", "lyrics", "audio_url", "genre", "url_image", "is_duet", "vip_required"],
+            include: [
+                {
+                    model: Artist,
+                    as: 'songArtist',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: Album,
+                    as: 'albums',
+                    attributes: ['id', 'title'],
+                    through: {
+                      attributes: ['album_id']
+                    }
+                }
+            ]
+
+        })
         res.status(200).json(song)
     }catch(error){
         console.error('Error fetching songs:', error);
@@ -350,6 +388,7 @@ const getTopSong = async(req, res) =>{
 }
 module.exports={
     createSong,
+    deleteSong,
     getSong,
     createArtist,
     updateArtist,

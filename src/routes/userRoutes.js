@@ -58,9 +58,10 @@ router.get('/getStarAccount',UserController.getStarAccount)
 
 router.post('/updateDeviceToken',authenticateToken,UserController.updateDeviceToken) 
 router.post('/SongRequestFromUser', authenticateToken, UserController.SongRequestFromUser)
-router.get('/getSongRequestFromUser', UserController.getSongRequestFromUser)
 
 router.get('/getRecordedSongOfUser', authenticateToken,UserController.getRecordedSongOfUser)
 router.post('/makeSongPublic/:songPostId',UserController.makeSongPublic)
 router.delete('/removeRecordedSong/:songPostId',UserController.removeRecordedSong)
+
+router.get('/getAllTopicsWithVideoOfAdmin',UserController.getAllTopicsWithVideoOfAdmin)
 module.exports = router;
