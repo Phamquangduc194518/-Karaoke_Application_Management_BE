@@ -25,10 +25,6 @@ Replies.init(
             type: DataTypes.TEXT,
             allowNull: false,
           },
-          is_admin: {
-            type: DataTypes.BOOLEAN,
-            defaultValue: true,
-          }
     },
     {
         sequelize,

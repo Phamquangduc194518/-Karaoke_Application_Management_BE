@@ -45,8 +45,6 @@ router.post('/uploadImagePost',upload.single('image'),UserController.uploadImage
 router.post('/stickers',UserController.createSticker)
 router.get('/stickers',UserController.getSticker)
 
-router.get('/search', UserController.search);
-
 router.get('/getFollowNotification', authenticateToken,UserController.getFollowNotification);
 router.get('/unreadNotifications', authenticateToken,UserController.unreadNotifications);
 router.patch("/readNotifications/:notificationId", authenticateToken,UserController.isReadNotification);
@@ -64,4 +62,9 @@ router.post('/makeSongPublic/:songPostId',UserController.makeSongPublic)
 router.delete('/removeRecordedSong/:songPostId',UserController.removeRecordedSong)
 
 router.get('/getAllTopicsWithVideoOfAdmin',UserController.getAllTopicsWithVideoOfAdmin)
+router.get('/getAllVideoOfTopic/:topicId',UserController.getAllVideoOfTopic)
+router.get('/recommendSongs',authenticateToken,UserController.RecommendSongs)
+router.get('/search', UserController.search);
+
+router.get('/CheckPostingCondition',authenticateToken, UserController.CheckPostingCondition);
 module.exports = router;

@@ -17,8 +17,8 @@ NotificationUser.init({
     allowNull: false
   },
   type: {
-    type: DataTypes.STRING,
-    allowNull: false
+    type: DataTypes.ENUM("Follow","Replies"),
+    defaultValue:"Follow",
   },
   message: {
     type: DataTypes.STRING,

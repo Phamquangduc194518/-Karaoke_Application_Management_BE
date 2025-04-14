@@ -48,8 +48,12 @@ User.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    rank: {
+      type: DataTypes.ENUM("Bronze", "Silver", "Gold", "Platinum", "Diamond"), 
+      defaultValue: "Bronze",
+    },
     role: {
-      type: DataTypes.ENUM("normal", "vip"), // Phân quyền tài khoản
+      type: DataTypes.ENUM("normal", "vip"),
       defaultValue: "normal",
     },
     device_token: {
@@ -58,11 +62,11 @@ User.init(
     },
     createdAt: {
       type: DataTypes.DATE,
-      field: 'created_at', // Liên kết với cột `created_at`
+      field: 'created_at',
     },
     updatedAt: {
       type: DataTypes.DATE,
-      field: 'updated_at', // Liên kết với cột `updated_at`
+      field: 'updated_at',
     },
   },
   {

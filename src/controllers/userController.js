@@ -24,10 +24,11 @@ const serviceAccount = require('../../firebaseAdminSdk.json');
 const RequestFromUser = require('../model/RequestFromUser');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const natural = require('natural');
 
 
 const register = async (req, res) => {
-  const { username, email, password, role } = req.body;
+  const { username, email, password, role, rank } = req.body;
 
   // Kiểm tra đầu vào
   if (!username || !email || !password) {
@@ -56,6 +57,7 @@ const register = async (req, res) => {
       password: hashedPassword,
       active: false,
       role: role || "normal",
+      rank: "Bronze",
     });
 
     return res.status(200).json({ message: "Đăng ký tài khoản thành công"})
@@ -77,7 +79,7 @@ const login = async (req, res) => {
     // Tìm người dùng theo email
     const user = await User.findOne({ 
       where: { email },
-      attributes: ['id', 'username', 'email', 'password', 'avatar_url', 'phone', 'role']
+      attributes: ['id', 'username', 'email', 'password', 'avatar_url', 'phone', 'role', 'rank']
     });
     if (!user) {
       return res.status(404).send('Email không tồn tại');
@@ -90,7 +92,7 @@ const login = async (req, res) => {
     }
     // Tạo token
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role},
+      { id: user.id, email: user.email, role: user.role, rank: user.rank},
       process.env.JWT_SECRET, // Khóa bí mật
       { expiresIn: '1h' } // Token hết hạn sau 1 giờ
   );
@@ -104,6 +106,7 @@ const login = async (req, res) => {
         email: user.email,
         avatar_url: user.avatar_url,
         role: user.role,
+        rank: user.rank
       }});
   } catch (error) {
     console.error('Lỗi trong quá trình đăng nhập:', error);
@@ -199,7 +202,7 @@ const userProfile = async (req, res)=>{
     }else{
       const userInfo = await User.findOne({
         where :{id: userId},
-        attributes: ["user_id","username", "email", "slogan", "password", "phone", "date_of_birth", "gender", "avatar_url", "role"],
+        attributes: ["user_id","username", "email", "slogan", "password", "phone", "date_of_birth", "gender", "avatar_url", "role", "rank"],
       });
       if (!userInfo) {
         return res.status(404).json({ message: "Người dùng không tồn tại" }); // Nếu người dùng không tồn tại
@@ -254,13 +257,30 @@ const updateUser =async (req, res) => {
   }
 };
 
+const CheckPostingCondition = async (req,res)=>{
+  const user_id = req.user.id
+  const userRank = req.user.rank
+  let allowedPosts = 0;
+  if (userRank === 'Bronze') {
+    allowedPosts = 3;
+  } else if (userRank === 'Silver') {
+    allowedPosts = 5;
+  } else if (userRank === 'Gold') {
+    allowedPosts = 10;
+  } else {
+    allowedPosts = 3;
+  }
+  const count = await RecordedSong.count({where:{user_id: user_id}});
+  const canPost = count < allowedPosts;
+  return res.status(200).json({ canPost });
+}
 
 const createRecordedSong = async(req, res) => {
 
   try{
   const user_id = req.user.id;
   const{song_name, recording_path, cover_image_url, title, status} = req.body;
-
+  
   if (!song_name || !recording_path || !title) {
     return res.status(400).json({
       message: 'Thiếu thông tin cần thiết (song_name, recording_path, !title)!',
@@ -272,9 +292,8 @@ const createRecordedSong = async(req, res) => {
     recording_path,
     cover_image_url,
     title,
-    status: status || 'public', // Mặc định là public nếu không được gửi
+    status: status || 'public',
   });
-
   return res.status(201).json(recordedSong);
   }catch(error){
     return res.status(500).json({
@@ -282,7 +301,6 @@ const createRecordedSong = async(req, res) => {
       error: error.message,
     });
   }
-
 }
 
 const removeRecordedSong = async(req,res) =>{
@@ -505,13 +523,37 @@ const getAllTopicsWithVideo = async(req, res) =>{
             {
               model: Video,
               as: 'videos',
-              attributes:["id", "topicId","title","url","thumbnail"]
+              attributes:["id", "topicId","title","subTitle","url","thumbnail","duration"]
             },
           ],
-          order: [['id','DESC']]
+          order: [['id','DESC']],
+          attributes:["id","title","subTitle","duration","type"]
         }
       );
       return res.status(200).json(topics);
+  }catch(error) {
+      res.status(500).json({ error: "Lỗi server", details: error.message });
+ }
+}
+
+const getAllVideoOfTopic = async(req, res) =>{
+  try{
+    const topicId= req.params.topicId
+      const topic = await Topic.findOne(
+        {
+          where:{id: topicId},
+          include:[
+            {
+              model: Video,
+              as: 'videos',
+              attributes:["id", "topicId","title","subTitle","url","thumbnail","duration"]
+            },
+          ],
+          order: [['id','DESC']],
+          attributes:["id","title","subTitle","duration","type"]
+        }
+      );
+      return res.status(200).json(topic);
   }catch(error) {
       res.status(500).json({ error: "Lỗi server", details: error.message });
  }
@@ -623,9 +665,25 @@ const getUserProfile  = async(req, res) =>{
   }
 }
 
+const updateUserRankBasedOnFollowers  = async(userId) =>{
+  const followerCount = await Follow.count({
+    where: { following_id: userId }
+  });
+  let newRank = "Bronze"; 
+  if (followerCount === 4) {
+    newRank = "Silver";
+  } else if (followerCount >= 5) {
+    newRank = "Gold";
+  }else{
+    newRank ="Bronze";
+  }
+  await User.update({ rank: newRank }, { where: { id: userId } });
+  return newRank;
+}
+
 const followUser = async(req, res) =>{
   try{
-    const {following_id } = req.body // người được theo dõi 
+    const {following_id } = req.body 
     const follower_id = req.user.id
 
     if (follower_id === following_id) {
@@ -638,11 +696,12 @@ const followUser = async(req, res) =>{
       return res.status(400).json({ error: "Bạn đã follow người này rồi!" });
     }
     await Follow.create({ follower_id, following_id });
+    const updatedRank = await updateUserRankBasedOnFollowers(following_id);
     await NotificationUser.create({
       recipient_id: following_id,
       sender_id: follower_id,
       type: 'follow',
-      message: 'Bạn có người mới follow!'
+      message: 'đã follow bạn!'
     });
     const recipient = await User.findOne({ where: { id: following_id } });
     const follower = await User.findOne({ where: { id: follower_id } });
@@ -771,7 +830,7 @@ const unreadNotifications  = async (req, res) =>{
           {
             model: User,
             as: 'user',
-            attributes: ['user_id', 'username', 'avatar_url'] // Lấy thông tin user
+            attributes: ['user_id', 'username', 'avatar_url']
           }
         ],
         order : [['createdAt', 'DESC']]
@@ -1227,6 +1286,120 @@ const SongRequestFromUser = async (req,res) =>{
     return res.status(500).json({ error: "Lỗi server", details: error.message });
   }
 }
+
+const RecommendSongs = async(req, res)=>{
+  try{
+    const userId = req.user.id
+    const favorites = await Favorite.findAll({where:{user_id:userId}});
+    const favoriteSongIds = favorites.map(fav => fav.song_id)
+
+    if(favoriteSongIds.length === 0){
+      const topSongs = await Song.findAll({ limit: 3, order: [['id', 'DESC']] });
+      return res.status(200).json({
+        message: "Người dùng chưa có bài hát yêu thích, trả về đề xuất mặc định",
+        recommendations: topSongs
+      });
+    }
+
+    const songs = await Song.findAll({
+      attributes: ['id','title', 'subTitle', 'genre', 'lyrics','artist_id']
+    });
+    const songDocs = songs.map(song =>{
+      return `${song.title || ""} ${song.subTitle || ""} ${song.genre || ""} ${song.lyrics || ""}`;
+    })
+    const tfidf = new natural.TfIdf();
+    songDocs.forEach(doc => tfidf.addDocument(doc));
+    const baselineSongId = favoriteSongIds[0];
+    const baselineIndex = songs.findIndex(song => song.id === baselineSongId);
+    if (baselineIndex < 0) {
+      return res.status(404).json({ message: "Bài hát tham chiếu không tồn tại" });
+    }
+
+    const vocabulary = [];
+    tfidf.documents.forEach(doc => {
+      Object.keys(doc).forEach(term =>{
+        if(term != '__key' && !vocabulary.includes(term)){
+          vocabulary.push(term);
+        }
+      });
+    });
+
+    const songVectors = songs.map((map,index)=>{
+      return vocabulary.map(term => tfidf.tfidf(term, index));
+    });
+   
+    const baselineVector = songVectors[baselineIndex];
+
+    function cosineSimilarity( vecA, vecB){
+      let dot = 0, normA = 0, normB = 0;
+      for (let i = 0; i < vecA.length; i++) {
+        dot += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+      }
+      normA = Math.sqrt(normA);
+      normB = Math.sqrt(normB);
+      return normA && normB ? dot / (normA * normB) : 0;
+    }
+
+    const contentScores = songs.map((song, index) =>{
+      if (favoriteSongIds.includes(song.id)) {
+        return { songId: song.id, score: 0 };
+      }
+      const score = cosineSimilarity(baselineVector, songVectors[index]);
+      return { songId: song.id, score };
+    })
+
+    const collaborativeScoresMap = {};
+    for(let favSongId of favoriteSongIds){
+      const otherFavs = await Favorite.findAll({
+        where: {
+          song_id: favSongId,
+          user_id: { [Op.ne]: userId }
+        }
+      });
+      for(let fav of otherFavs){
+        const otherUserFavs = await Favorite.findAll({
+          where:{
+            user_id: fav.user_id,
+            song_id: { [Op.notIn]: favoriteSongIds }
+          }
+        });
+        otherUserFavs.forEach(otherFav  =>{
+          collaborativeScoresMap[otherFav.song_id] = (collaborativeScoresMap[otherFav.song_id] || 0) + 1;
+        });
+      }
+    }
+    const collabScoresArray = Object.keys(collaborativeScoresMap).map(songId => ({
+      songId: parseInt(songId, 10),
+      score: collaborativeScoresMap[songId]
+    }));
+
+    const collabMap = {};
+    collabScoresArray.forEach(item => {
+      collabMap[item.songId] = item.score;
+    });
+
+    const combinedScores = contentScores.map(item => {
+      const collabScore = collabMap[item.songId] || 0;
+      const combined = 0.5 * item.score + 0.5 * collabScore;
+      return { songId: item.songId, score: combined };
+    });
+
+    combinedScores.sort((a, b) => b.score - a.score);
+
+    const topSongIds = combinedScores.slice(0, 3).map(item => item.songId);
+    const recommendedSongs = await Song.findAll({
+      where: { id: { [Op.in]: topSongIds } },
+      attributes: ['id', 'title', 'subTitle', 'genre', 'lyrics' ,'audio_url', 'url_image']
+    });
+
+    res.status(200).json({ recommendations: recommendedSongs });
+  } catch (error) {
+    console.error("Error in recommendSongs:", error);
+    res.status(500).json({ error: error.message });
+  }
+}
 module.exports = {
   register,
   login,
@@ -1273,5 +1446,8 @@ module.exports = {
   getRecordedSongOfUser,
   makeSongPublic,
   removeRecordedSong,
-  getAllTopicsWithVideoOfAdmin
+  getAllTopicsWithVideoOfAdmin,
+  getAllVideoOfTopic,
+  RecommendSongs,
+  CheckPostingCondition
 };

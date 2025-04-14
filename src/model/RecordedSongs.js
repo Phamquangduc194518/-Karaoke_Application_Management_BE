@@ -17,8 +17,8 @@ RecordedSong.init(
                     model: User,
                     key: 'user_id',
             },
-            onDelete: 'CASCADE', // Xóa bản ghi liên quan nếu user bị xóa
-            onUpdate: 'CASCADE', // Cập nhật khóa nếu id trong Users thay đổi
+            onDelete: 'CASCADE', 
+            onUpdate: 'CASCADE', 
           },
         song_name: {
             type: DataTypes.STRING,
@@ -34,7 +34,7 @@ RecordedSong.init(
           },
         cover_image_url: {
             type: DataTypes.STRING,
-            allowNull: true, // Cho phép null nếu không có ảnh
+            allowNull: true, 
           },
         upload_time: {
             type: DataTypes.DATE,
@@ -47,6 +47,10 @@ RecordedSong.init(
         comments_count: {
             type: DataTypes.INTEGER,
             defaultValue: 0,
+          },
+        statusFromAdmin:{
+          type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+          defaultValue: 'pending'
           },
         status: {
             type: DataTypes.ENUM('public', 'private'),

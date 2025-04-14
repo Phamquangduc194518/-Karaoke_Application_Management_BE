@@ -1,7 +1,14 @@
 const bcrypt = require('bcryptjs');
 const Admin = require('../model/Admin'); // Sử dụng model Admin
 const jwt = require('jsonwebtoken');
-const { RequestFromUser, User, Replies } = require('../model');
+const { RequestFromUser, User, Replies, Favorite } = require('../model');
+const admin = require('firebase-admin');
+const NotificationUser = require('../model/NotificationUser');
+const { RecommendSongs } = require('./userController');
+const RecordedSong = require('../model/RecordedSongs');
+const FavoritePost = require('../model/FavoritesPost');
+const Comments = require('../model/Comments');
+const sequelize = require('../config/database');
 
 const loginAdmin = async (req, res) => {
   const { email, password } = req.body;
@@ -81,7 +88,7 @@ const getSongRequestFromUser = async(req,res)=>{
           {
             model: Replies,
             as: 'replies',
-            attributes:["id", "content", "createdAt", "is_admin"]
+            attributes:["id", "content", "createdAt"]
           }
         ]
       });
@@ -90,24 +97,6 @@ const getSongRequestFromUser = async(req,res)=>{
     return res.status(500).json({ error: "Lỗi server", details: error.message });
   }
 }
-
-const createReplie = async(req, res) =>{
-  try{
-    const { request_id, content, is_admin } = req.body;
-    if (!request_id || !content) {
-      return res.status(400).json({ message: "Thiếu dữ liệu phản hồi" });
-    }
-    const newReply = await Replies.create({
-      request_id,
-      content,
-      is_admin: is_admin ?? true,
-    });
-    res.status(200).json({ message: "Phản hồi thành công", reply: newReply });
-  }catch (error){
-    return res.status(500).json({ error: "Lỗi server", details: error.message });
-  }
-}
-
 const updateStatus = async (req, res) =>{
   try{
       const {request_id, status} = req.body
@@ -126,11 +115,138 @@ const updateStatus = async (req, res) =>{
   }
 }
 
+function sendAdminReplyNotification(deviceToken, replyContent) {
+  const message = {
+    notification: {
+      title: 'Phản hồi từ Admin',
+      body: replyContent
+    },
+    token: deviceToken
+  };
+
+  admin.messaging().send(message)
+    .then((response) => {
+      console.log("Thông báo admin đã được gửi thành công:", response);
+    })
+    .catch((error) => {
+      console.error("Lỗi khi gửi thông báo từ admin:", error);
+    });
+}
+
+const createReplie = async(req, res) =>{
+  try{
+    const { request_id, content} = req.body;
+    if (!request_id || !content) {
+      return res.status(400).json({ message: "Thiếu dữ liệu phản hồi" });
+    }
+    const request = await RequestFromUser.findOne({ where: { id: request_id } });
+    const newReply = await Replies.create({
+      request_id,
+      content
+    });
+    const notification = await NotificationUser.create({
+      recipient_id: request.user_id,
+      sender_id: 18, 
+      type: 'Replies',
+      message: content
+    })
+    const recipient = await User.findOne({ where: { id: request.user_id } });
+    if (recipient && recipient.device_token) {
+      sendAdminReplyNotification(recipient.device_token);
+    }
+    return res.status(200).json({ message: "Phản hồi thành công", reply: newReply });
+  }catch (error){
+    return res.status(500).json({ error: "Lỗi server", details: error.message });
+  }
+}
+
+const getRecordedSongsForAdmin = async (req, res)=>{
+  try{
+    const recordedSongs = await RecordedSong.findAll({
+      attributes: [
+        'id',
+        'title',
+        'cover_image_url',
+        'recording_path',
+        'likes_count',
+        'comments_count',
+        'statusFromAdmin',
+        'upload_time'
+      ],
+      include:[{
+        model: User,
+        as: 'user',
+        attributes: ['user_id', 'username', 'avatar_url'],
+        order: [['upload_time', 'DESC']]
+    }]
+    })
+    return res.status(200).json(recordedSongs);
+  }catch (error) {
+    console.error("Lỗi khi lấy danh sách bài thu âm:", error);
+    return res.status(500).json({ message: "Lỗi server", error: error.message });
+  }
+}
+
+const deleteRecordedSongByAdmin = async(req,res) =>{
+  try{
+    const { songId } = req.params;
+    await FavoritePost.destroy({ where: { post_id: songId } });
+    const deleted = await RecordedSong.destroy({
+      where: { id: songId }
+    });
+    if(deleted == 0){
+      return res.status(404).json({ message: "Không tìm thấy bài thu âm để xoá" });
+    }
+    return res.status(200).json({ message: "Đã xoá bài thu âm thành công" });
+  }catch (error) {
+    console.error("Lỗi khi xoá bài thu âm:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ", error: error.message });
+  }
+}
+
+const ApproveRecordedSong= async(req, res) =>{
+  try{
+    const { songId } = req.params;
+    const [updated] = await RecordedSong.update(
+      { statusFromAdmin: "approved"},
+      { where: { id: songId } }
+    )
+    if (updated === 0) {
+      return res.status(404).json({ message: "Không tìm thấy bài thu âm" });
+    }
+     return res.status(200).json({ message: `Trạng thái đã được cập nhật thành approved` });
+  }catch (error) {
+    console.error("Lỗi cập nhật trạng thái bài thu âm:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ", error: error.message });
+  }
+}
+
+const RejectRecordedSong= async(req, res) =>{
+  try{
+    const { songId } = req.params;
+    const [updated] = await RecordedSong.update(
+      { statusFromAdmin: "rejected" },
+      { where: { id: songId } }
+    )
+    if (updated === 0) {
+      return res.status(404).json({ message: "Không tìm thấy bài thu âm" });
+    }
+     return res.status(200).json({ message: `Trạng thái đã được cập nhật thành rejected` });
+  }catch (error) {
+    console.error("Lỗi cập nhật trạng thái bài thu âm:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ", error: error.message });
+  }
+}
+
 
 module.exports = {
   loginAdmin,
   registerAdmin,
   getSongRequestFromUser,
   createReplie,
-  updateStatus
+  updateStatus,
+  getRecordedSongsForAdmin,
+  deleteRecordedSongByAdmin,
+  ApproveRecordedSong,
+  RejectRecordedSong,
 };

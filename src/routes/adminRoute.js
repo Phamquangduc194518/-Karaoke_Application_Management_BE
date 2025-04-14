@@ -9,4 +9,8 @@ router.get('/getAllAccount',User.getAllAccount)
 router.get('/getSongRequestFromUser', Admin.getSongRequestFromUser)
 router.post('/createReplie', Admin.createReplie)
 router.patch('/updateStatus', Admin.updateStatus)
+router.get('/getRecordedSongsForAdmin', Admin.getRecordedSongsForAdmin)
+router.delete('/deleteRecordedSongByAdmin/:songId', Admin.deleteRecordedSongByAdmin)
+router.patch('/approveRecordedSong/:songId', Admin.ApproveRecordedSong)
+router.patch('/rejectRecordedSong/:songId', Admin.RejectRecordedSong)
 module.exports = router;

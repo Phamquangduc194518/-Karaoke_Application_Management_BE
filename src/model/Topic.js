@@ -14,7 +14,20 @@ Topic.init(
         type: DataTypes.STRING,
         allowNull: false,
       }  
+    ,
+    subTitle:  {
+      type: DataTypes.STRING,
+      allowNull: false,
+    }, 
+    duration: {
+      type: DataTypes.STRING,
+      allowNull: false,
     },
+    type: {
+      type: DataTypes.ENUM("cơ bản","nâng cao","phát âm","luyện giọng","nổi bật"),
+      defaultValue: "cơ bản"
+    }
+  },
     {
         sequelize,
         modelName: 'Topic',
