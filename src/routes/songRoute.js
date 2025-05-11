@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const songController = require('../controllers/songController')
-const { authenticateToken, authorizeRole } = require('../authMiddleware');
+const { authenticateToken, authorizeRole } = require('../middlewares/authMiddleware');
 
 router.post('/createSong',songController.createSong);
 router.delete('/deleteSong',songController.deleteSong);

@@ -18,17 +18,17 @@ Comments.init(
                 model: User,
                 key: 'user_id',
             },
-            onDelete: 'CASCADE', // Xóa tất cả bình luận nếu người dùng bị xóa
+            onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
         },
         song_id: {
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
-              model: RecordedSong, // Tên của model bảng RecordedSongs
-              key: 'id', // Khóa chính của bảng RecordedSongs
+              model: RecordedSong, 
+              key: 'id', 
             },
-            onDelete: 'CASCADE', // Xóa tất cả bình luận nếu bài hát bị xóa
+            onDelete: 'CASCADE', 
             onUpdate: 'CASCADE',
           },
         comment_text: {

@@ -22,6 +22,10 @@ Video.init(
             type: DataTypes.STRING,
             allowNull: false,
           }, 
+        subTitle: {
+            type: DataTypes.STRING,
+            allowNull: false,
+          }, 
         url: {
             type: DataTypes.STRING(500),  
             allowNull: false,
@@ -29,7 +33,11 @@ Video.init(
         thumbnail: {
             type: DataTypes.STRING(500),  
             allowNull: false,
-        }
+        },
+        duration: {
+            type: DataTypes.STRING,
+            allowNull: false,
+          },
     },
     {
         sequelize,

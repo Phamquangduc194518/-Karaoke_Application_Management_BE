@@ -5,28 +5,32 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node app.js"
+    "start": "node app.js",
+    "reindex": "node src/scripts/reindex.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@elastic/elasticsearch": "^9.0.0",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.5.0",
     "express": "^4.21.2",
     "firebase-admin": "^13.2.0",
     "googleapis": "^146.0.0",
     "jsonwebtoken": "^9.0.2",
     "karaoke_backend": "file:",
     "multer": "^1.4.5-lts.1",
-    "mysql2": "^3.13.0",
+    "mysql2": "^3.14.1",
     "natural": "^8.0.1",
     "nodemailer": "^6.10.0",
     "path": "^0.12.7",
-    "sequelize": "^6.37.5",
+    "sequelize": "^6.37.7",
     "sequelize-cli": "^6.6.2",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "streamifier": "^0.1.1"
   }
 }

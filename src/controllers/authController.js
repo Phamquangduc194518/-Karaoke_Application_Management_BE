@@ -160,6 +160,24 @@ const createReplie = async(req, res) =>{
   }
 }
 
+function sendAdminReplyNotification2(deviceToken, rejectReason) {
+  const message = {
+    notification: {
+      title: 'Phản hồi từ Admin về Bài Đăng của Bạn',
+      body: rejectReason
+    },
+    token: deviceToken
+  };
+
+  admin.messaging().send(message)
+    .then((response) => {
+      console.log("Thông báo admin đã được gửi thành công:", response);
+    })
+    .catch((error) => {
+      console.error("Lỗi khi gửi thông báo từ admin:", error);
+    });
+}
+
 const getRecordedSongsForAdmin = async (req, res)=>{
   try{
     const recordedSongs = await RecordedSong.findAll({
@@ -171,7 +189,8 @@ const getRecordedSongsForAdmin = async (req, res)=>{
         'likes_count',
         'comments_count',
         'statusFromAdmin',
-        'upload_time'
+        'upload_time',
+        'rejectReason'
       ],
       include:[{
         model: User,
@@ -224,12 +243,28 @@ const ApproveRecordedSong= async(req, res) =>{
 const RejectRecordedSong= async(req, res) =>{
   try{
     const { songId } = req.params;
+    const {reason} = req.body;
     const [updated] = await RecordedSong.update(
-      { statusFromAdmin: "rejected" },
-      { where: { id: songId } }
+      { statusFromAdmin: "rejected",
+        rejectReason: reason},
+      { where: { id: songId } },
     )
     if (updated === 0) {
       return res.status(404).json({ message: "Không tìm thấy bài thu âm" });
+    }
+    const user_id = await RecordedSong.findOne({
+      where: {id: songId},
+      attributes:['user_id']
+    })
+    const notification = await NotificationUser.create({
+      recipient_id: user_id.dataValues.user_id,
+      sender_id: 18, 
+      type: 'RejectReason',
+      message: reason
+    })  
+    const recipient = await User.findOne({ where: { id: user_id.dataValues.user_id } });
+    if (recipient && recipient.device_token) {
+      sendAdminReplyNotification2(recipient.device_token);
     }
      return res.status(200).json({ message: `Trạng thái đã được cập nhật thành rejected` });
   }catch (error) {

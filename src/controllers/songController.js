@@ -3,6 +3,7 @@ const { Artist, Album, Favorite, AlbumSong, User } = require('../model');
 const Song = require('../model/Song');
 const Lyrics = require('../model/DuetLyrics');
 const sequelize = require('../config/database');
+const { indexSong } = require('../config/elasticsearch');
 
 const createSong = async(req, res) => {
     const {title, subTitle, artist_id, genre, lyrics, audio_url, url_image, is_duet,vip_required,} = req.body
@@ -21,6 +22,7 @@ const createSong = async(req, res) => {
             is_duet: is_duet === 'true' || is_duet === true,
             vip_required: vip_required === 'true' || vip_required === true,
         });
+            await indexSong(newSong);
             res.status(201).send({message: 'Tạo bài hát thành công', newSong});
         }catch(error){
             res.status(500).send("Lưu bài hát gặp sự cố")

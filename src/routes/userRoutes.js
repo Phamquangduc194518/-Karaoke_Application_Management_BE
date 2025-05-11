@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const UserController = require('../controllers/userController')
-const { authenticateToken, authorizeRole } = require('../authMiddleware');
+const { authenticateToken, authorizeRole } = require('../middlewares/authMiddleware');
 const multer = require('multer');
 const { route } = require('./adminRoute');
 // Sử dụng memory storage: file sẽ được lưu trong req.file.buffer
@@ -67,4 +67,6 @@ router.get('/recommendSongs',authenticateToken,UserController.RecommendSongs)
 router.get('/search', UserController.search);
 
 router.get('/CheckPostingCondition',authenticateToken, UserController.CheckPostingCondition);
+router.get('/activityStatistics',authenticateToken, UserController.activityStatistics);
+router.get('/searchByElasticsearch', UserController.searchByElasticsearch);
 module.exports = router;

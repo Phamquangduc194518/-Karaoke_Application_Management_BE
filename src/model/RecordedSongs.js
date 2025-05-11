@@ -56,6 +56,10 @@ RecordedSong.init(
             type: DataTypes.ENUM('public', 'private'),
             defaultValue: 'public',
           },
+        rejectReason: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+          }
     },
     {
         sequelize,

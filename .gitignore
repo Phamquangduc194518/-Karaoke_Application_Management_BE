@@ -51,7 +51,7 @@ yarn.lock
 
 # Ignore local static files
 *.local
-
+.env
 # Generated directories for Node gyp
 build/Release
 src/config/keys/

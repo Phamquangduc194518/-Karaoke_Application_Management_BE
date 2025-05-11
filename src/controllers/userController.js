@@ -25,6 +25,9 @@ const RequestFromUser = require('../model/RequestFromUser');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const natural = require('natural');
+const { indexUser } = require('../config/elasticsearch');
+const { esClient } = require('../config/elasticsearch');
+const ChatRoom = require('../model/ChatRoom');
 
 
 const register = async (req, res) => {
@@ -59,7 +62,7 @@ const register = async (req, res) => {
       role: role || "normal",
       rank: "Bronze",
     });
-
+    await indexUser(user);
     return res.status(200).json({ message: "Đăng ký tài khoản thành công"})
   } catch (error) {
     console.error('Lỗi trong quá trình đăng ký:', error);
@@ -186,6 +189,8 @@ const updateProfile = async (req, res)=>{
 
     const updateUser  = await User.update(updateData,{where:{id : userId}})
       if (updateUser[0] === 0) return res.status(404).send('Người dùng không tồn tại');
+      const updatedUser = await User.findOne({ where: { id: userId } });
+      await indexUser(updatedUser);
       return res.status(200).json({message:"cập nhật profile thành công"});
   
   }catch(error){
@@ -205,7 +210,7 @@ const userProfile = async (req, res)=>{
         attributes: ["user_id","username", "email", "slogan", "password", "phone", "date_of_birth", "gender", "avatar_url", "role", "rank"],
       });
       if (!userInfo) {
-        return res.status(404).json({ message: "Người dùng không tồn tại" }); // Nếu người dùng không tồn tại
+        return res.status(404).json({ message: "Người dùng không tồn tại" }); 
       }
       return res.status(200).json(userInfo)
     }
@@ -324,7 +329,6 @@ const getRecordedSongList = async (req, res) => {
   try {
     const currentUserId = req.user.id;
 
-    // ✅ Cập nhật likes_count
     await sequelize.query(`
       UPDATE RecordedSong rs
       LEFT JOIN (
@@ -335,7 +339,6 @@ const getRecordedSongList = async (req, res) => {
       SET rs.likes_count = IFNULL(f.like_count, 0)
     `, { type: sequelize.QueryTypes.UPDATE });
 
-    // ✅ Cập nhật comments_count
     await sequelize.query(`
       UPDATE RecordedSong rs
       LEFT JOIN (
@@ -346,27 +349,31 @@ const getRecordedSongList = async (req, res) => {
       SET rs.comments_count = IFNULL(c.comment_count, 0)
     `, { type: sequelize.QueryTypes.UPDATE });
 
-    // ✅ Lấy danh sách user mà current user đang follow
     const followings = await Follow.findAll({
       where: { follower_id: currentUserId },
       attributes: ['following_id']
     });
     const followingIds = followings.map(f => f.following_id);
 
-    // Truy vấn bài hát thỏa 3 điều kiện
     const record = await RecordedSong.findAll({
       where: {
         [Op.or]: [
           { 
             [Op.and]: [
             {user_id: { [Op.in]: followingIds }},
-            { status: "public" }
+            { status: "public" },
+            {statusFromAdmin: "approved"}
             ]
           },
-          { user_id: currentUserId },
+          { 
+            [Op.and]:[
+              {user_id: currentUserId},
+              {statusFromAdmin: {[Op.in]:["approved", "pending"]}}
+            ]
+          },
           {
             [Op.and]:[
-               sequelize.literal('likes_count > 5'), // ✅ đúng cú pháp
+               sequelize.literal('likes_count > 5'),
                { status: "public" }
             ]
            
@@ -383,7 +390,8 @@ const getRecordedSongList = async (req, res) => {
         "upload_time",
         "comments_count",
         "likes_count",
-        "status"
+        "status",
+        "statusFromAdmin"
       ],
       include: [
         {
@@ -654,7 +662,7 @@ const getUserProfile  = async(req, res) =>{
     const user_id = req.params.user_id
     const user = await User.findOne({
       where:{user_id: user_id},
-      attributes:["username", "email", "avatar_url"],
+      attributes:["user_id","username", "email", "avatar_url"],
     });
     if (!user) {
       return res.status(404).json({ error: "Người dùng không tồn tại" });
@@ -1134,6 +1142,48 @@ const search = async(req,res) =>{
   }
 }
 
+const searchByElasticsearch = async (req, res) => {
+  try {
+    const { q: keyword, type } = req.query;
+    if (!keyword) {
+      return res.status(400).json({ error: 'Missing q parameter' });
+    }
+
+    const body = {
+      query: {
+        multi_match: {
+          query: keyword,
+          fields: type === 'user'
+            ? ['username^3', 'slogan']
+            : ['title^3', 'subTitle', 'lyrics']
+        }
+      }
+    };
+
+    if (type === 'user' || type === 'song') {
+      const index = type === 'user' ? 'users' : 'songs';
+      const result = await esClient.search({ index, body });
+      const hits   = result.hits.hits.map(h => h._source);
+      return res.status(200).json(
+        type === 'user'
+          ? { users: hits }
+          : { songs: hits }
+      );
+    } else {
+      const [uRes, sRes] = await Promise.all([
+        esClient.search({ index: 'users', body }),
+        esClient.search({ index: 'songs', body })
+      ]);
+      const users = uRes.hits.hits.map(h => h._source);
+      const songs = sRes.hits.hits.map(h => h._source);
+      return res.status(200).json({ users, songs });
+    }
+  } catch (err) {
+    console.error('ES search error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 const createIsFavoritePost = async(req, res) =>{
   try{
     if (!req.user || !req.user.id) {
@@ -1400,6 +1450,29 @@ const RecommendSongs = async(req, res)=>{
     res.status(500).json({ error: error.message });
   }
 }
+
+const activityStatistics = async (req, res) =>{
+  try{
+    const user_id = req.user.id
+    const coverPostCount = await RecordedSong.count({where: {user_id: user_id}})
+    const likeCoverCount = await FavoritePost.count({where: {user_id: user_id}})
+    const likeSongCount = await Favorite.count({where: {user_id: user_id}})
+    const [songCommentCount, streamCommentCount] = await Promise.all([
+      Comments.count({ where: {user_id: user_id } }),        
+      CommentsVideo.count({ where: {user_id: user_id } })
+    ])
+    const commentCount = songCommentCount + streamCommentCount
+    return res.status(200).json({
+      coverPostCount,
+      likeCoverCount,
+      likeSongCount,
+      commentCount
+    })
+  }catch (error) {
+    console.error("Error in activitStatistics:", error);
+    res.status(500).json({ error: error.message });
+  }
+}
 module.exports = {
   register,
   login,
@@ -1433,6 +1506,7 @@ module.exports = {
   createSticker,
   getSticker,
   search,
+  searchByElasticsearch,
   getFollowNotification,
   isReadNotification,
   unreadNotifications,
@@ -1449,5 +1523,6 @@ module.exports = {
   getAllTopicsWithVideoOfAdmin,
   getAllVideoOfTopic,
   RecommendSongs,
-  CheckPostingCondition
+  CheckPostingCondition,
+  activityStatistics
 };

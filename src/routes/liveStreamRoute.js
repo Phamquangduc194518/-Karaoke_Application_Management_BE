@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const LiveStreamController = require('../controllers//liveStreamController')
-const { authenticateToken, authorizeRole } = require('../authMiddleware');
+const { authenticateToken, authorizeRole } = require('../middlewares/authMiddleware');
 
 
 router.post('/createLiveStream', authenticateToken,LiveStreamController.createLiveStream);
