@@ -6,6 +6,7 @@ const ChatMessageStatus = require('../model/ChatMessageStatus');
 const sequelize = require('../config/database');
 const { User } = require('../model');
 const { Op, Sequelize } = require("sequelize");
+const admin = require('firebase-admin');
 
 const registerSocketHandlers = (io) => {
     io.on('connection', (socket) => {
@@ -125,33 +126,51 @@ const registerSocketHandlers = (io) => {
                 socket.emit('error', err.message);
               }
             }
-            if(event === 'mark_read'){
-              console.log('mark_delivered via wrapper:', data);
-              const { messageId, userId } = data;
-              console.log(`Received mark_read: messageId=${messageId}, userId=${userId}`)
-              const updated = await ChatMessageStatus.update(
-                { status: 'read', updated_at: new Date() },
-                {
-                  where: {
-                    message_id: messageId,
-                    user_id: userId,
-                    status: 'delivered',
-                  },
+                if(event === 'mark_read'){
+                  console.log('mark_read via wrapper:', data);
+                  const { messageId, userId } = data;
+                  console.log(`Received mark_read: messageId=${messageId}, userId=${userId}`)
+                  const updated = await ChatMessageStatus.update(
+                    { status: 'read', updated_at: new Date() },
+                    {
+                      where: {
+                        message_id: messageId,
+                        user_id: userId,
+                        status: { [Op.in]: ['sent', 'delivered'] },
+                      },
+                    }
+                  );
+                if (updated[0] > 0) {
+                    const message = await ChatMessage.findByPk(messageId);
+                    const statusPayload = { message_id: messageId, user_id: userId, status: 'read' };
+                    io.to(`room_${message.room_id}`).emit('mark_read', statusPayload);
+                  }
                 }
-              );
-              if (updated[0] > 0) {
-                const message = await ChatMessage.findByPk(messageId);
-                const statusPayload = { message_id: messageId, user_id: userId, status: 'read' };
-                io.to(`room_${message.room_id}`).emit('mark_read', statusPayload);
-              }
-            }
-        });
+              });
 
         socket.on('disconnect', () => {
             socket.leave(`user_${userId}`);
           });
     });
 };
+
+
+function sendNotificationMessage(deviceToken, senderUser){
+  const message = {
+    notification: {
+      title:`${senderUser} gửi tin nhắn cho bạn!`
+    },
+    token: deviceToken
+  };
+  admin.messaging().send(message)
+  .then((response) =>{
+    console.log("Thông báo admin đã được gửi thành công:", response);
+  })
+  .catch((error) => {
+      console.error("Lỗi khi gửi thông báo từ admin:", error);
+    });
+}
+
 
 module.exports = registerSocketHandlers;
 

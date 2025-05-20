@@ -37,11 +37,21 @@ const getRooms = async(req, res) =>{
               separate: true,
               order: [['createdAt', 'DESC']],
               limit: 1,
-              include: [{
+              include: [
+                {
                   model: User,
                   as: 'sender',
                   attributes: ['username', 'avatar_url']
-            }]
+                },
+                {
+                  model:ChatMessageStatus,
+                  as: 'statuses',
+                  where: { user_id: userId },
+                  required: false,
+                  limit: 1,
+                  attributes: ['status']
+                }
+              ]
             },
             {
               model: ChatRoomUser,
@@ -62,7 +72,19 @@ const getRooms = async(req, res) =>{
             )
           `)
         });
-        return res.json(rooms);
+        const result  = rooms .map(room =>{
+           const plainRoom = room.get({ plain: true });
+           plainRoom.messages = plainRoom.messages.map(msg => {
+            const status = msg.statuses?.[0]?.status || null;
+            delete msg.statuses;
+            return {
+              ...msg,
+              status 
+            };
+           });
+            return plainRoom;
+        })
+        return res.json(result);
       } catch (err) {
         console.error('Error in getRooms:', err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -97,9 +119,79 @@ const getMessages = async (req, res) => {
       return res.status(500).json({ error: 'Internal server error' });
     }
   };
+
+  const pendingDelivery = async (req, res)=>{
+    try{
+       const receivedId = req.user.id;
+       const [updatedCount] =  await ChatMessageStatus.update(
+      {
+        status: 'delivered',
+        updated_at: new Date()
+      },
+      {
+        where: {
+          user_id: receivedId,
+          status: 'sent'
+        }
+      }
+    );
+    const updatedMessages = await ChatMessageStatus.findAll({
+      where: {
+        user_id: receivedId,
+        status: 'delivered'
+      },
+      attributes: ['message_id']
+    });
+     const messageIds = updatedMessages.map(m => m.message_id);
+
+    return res.status(200).json({
+      updatedCount,
+      messageIds
+    });
+    }catch(err){
+      console.error('Error in pendingDelivery:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  const pendingRead = async (req, res)=>{
+    try{
+      const receivedId = req.user.id;
+       const [updatedCount] =  await ChatMessageStatus.update(
+      {
+        status: 'read',
+        updated_at: new Date()
+      },
+      {
+        where: {
+          user_id: receivedId,
+          status: 'delivered'
+        }
+      }
+    );
+    const updatedMessages = await ChatMessageStatus.findAll({
+      where: {
+        user_id: receivedId,
+        status: 'read'
+      },
+      attributes: ['message_id']
+    });
+     const messageIds = updatedMessages.map(m => m.message_id);
+
+    return res.status(200).json({
+      updatedCount,
+      messageIds
+      })
+    }catch(err){
+      console.error('Error in pendingDelivery:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
   
 module.exports = {
     onlineUsers,
     getRooms,
-    getMessages
+    getMessages,
+    pendingDelivery,
+    pendingRead
 }
