@@ -193,8 +193,8 @@ const updateProfile = async (req, res)=>{
       return res.status(200).json({message:"cập nhật profile thành công"});
   
   }catch(error){
-    console.error(error);
-    res.status(500).send('Lỗi máy chủ');
+     console.error("Update profile error:", error);
+  res.status(500).send('Lỗi máy chủ');
   }
 }
 
