@@ -167,10 +167,9 @@ const forgotPassword = async (req,res) =>{
 }
 const updateProfile = async (req, res)=>{
 
-  const userId = req.user.id// Lấy từ JWT
+  const userId = req.user.id
   const { username, slogan, phone, password, date_of_birth, gender, email, avatar_url } = req.body;
   try{
-    // Kiểm tra nếu tất cả các trường đều rỗng hoặc thiếu
     if (!username && !phone && !password && !date_of_birth && !gender && !email && !avatar_url && !slogan) {
       return res.status(400).send('Không có dữ liệu nào để cập nhật');
     }
