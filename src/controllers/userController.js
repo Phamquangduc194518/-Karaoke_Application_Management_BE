@@ -165,38 +165,75 @@ const forgotPassword = async (req,res) =>{
     return res.status(500).json({ message: "Lỗi máy chủ, vui lòng thử lại sau." });
   }
 }
-const updateProfile = async (req, res)=>{
+const updateProfile = async (req, res) => {
+  const userId = req.user.id;
+  const {
+    username,
+    slogan,
+    phone,
+    password,
+    date_of_birth,
+    gender,
+    email,
+    avatar_url
+  } = req.body;
 
-  const userId = req.user.id
-  const { username, slogan, phone, password, date_of_birth, gender, email, avatar_url } = req.body;
-  try{
-    if (!username && !phone && !password && !date_of_birth && !gender && !email && !avatar_url && !slogan) {
+  try {
+    // Kiểm tra nếu tất cả các trường đều không có
+    if (
+      !username &&
+      !phone &&
+      !password &&
+      !date_of_birth &&
+      !gender &&
+      !email &&
+      !avatar_url &&
+      !slogan
+    ) {
       return res.status(400).send('Không có dữ liệu nào để cập nhật');
     }
 
     // Tạo đối tượng chứa các trường cần cập nhật
-    const hashedPassword = password ? await bcrypt.hash(password,10) : undefined;
     const updateData = {};
+
     if (username) updateData.username = username;
     if (phone) updateData.phone = phone;
-    if (hashedPassword) updateData.password = hashedPassword; // Chỉ thêm password nếu có hash
+
+    // Kiểm tra password có rỗng không trước khi hash
+    if (password && password.trim() !== "") {
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
     if (date_of_birth) updateData.date_of_birth = date_of_birth;
     if (gender) updateData.gender = gender;
     if (email) updateData.email = email;
     if (avatar_url) updateData.avatar_url = avatar_url;
-    if (slogan) updateData.slogan = slogan
+    if (slogan) updateData.slogan = slogan;
 
-    const updateUser  = await User.update(updateData,{where:{id : userId}})
-      if (updateUser[0] === 0) return res.status(404).send('Người dùng không tồn tại');
-      const updatedUser = await User.findOne({ where: { id: userId } });
+    const updateUser = await User.update(updateData, {
+      where: { id: userId }
+    });
+
+    if (updateUser[0] === 0) {
+      return res.status(404).send('Người dùng không tồn tại');
+    }
+
+    const updatedUser = await User.findOne({ where: { id: userId } });
+
+    // Nếu bạn có tích hợp Elasticsearch, kiểm tra lỗi tại đây
+    try {
       await indexUser(updatedUser);
-      return res.status(200).json({message:"cập nhật profile thành công"});
-  
-  }catch(error){
-     console.error("Update profile error:", error);
-  res.status(500).send('Lỗi máy chủ');
+    } catch (esError) {
+      console.warn("Không thể index Elasticsearch:", esError.message);
+    }
+
+    return res.status(200).json({ message: "Cập nhật profile thành công" });
+
+  } catch (error) {
+    console.error("Lỗi khi cập nhật profile:", error.message, error.stack);
+    res.status(500).send('Lỗi máy chủ');
   }
-}
+};
 
 const userProfile = async (req, res)=>{
   try{
@@ -715,6 +752,7 @@ const followUser = async(req, res) =>{
     const followerName = follower ? follower.username : "Một người nào đó";
     if (recipient && recipient.device_token) {
       sendFollowNotification(recipient.device_token, followerName);
+      console.log("Token gửi FCM:", recipient.device_token);
     }
     res.status(200).json({ message: "Follow thành công!" });
   }catch(error){
