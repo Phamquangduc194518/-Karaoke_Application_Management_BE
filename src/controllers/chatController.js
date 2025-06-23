@@ -4,6 +4,7 @@ const ChatRoomUser = require("../model/ChatRoomUsers");
 const sequelize     = require("../config/database"); 
 const ChatMessage = require("../model/ChatMessage");
 const ChatMessageStatus = require("../model/ChatMessageStatus");
+const { Op } = require('sequelize');
 
 const onlineUsers = async (req, res) =>{
     try{
@@ -187,11 +188,42 @@ const getMessages = async (req, res) => {
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
+
+  const unreadMessage = async(req, res) =>{
+    try{
+      const userId = req.user.id
+      const unreadMessages = await ChatMessageStatus.findAll({
+      where: {
+        user_id: userId,
+        status: {
+          [Op.ne]: 'read'
+        }
+      },
+      include: [
+        {
+          model: ChatMessage,
+          as: 'message',
+          attributes: ['room_id']
+        }
+      ]
+    });
+    const unreadRoomIds = [
+      ...new Set(unreadMessages.map(m => m.message.room_id))
+    ];
+    res.status(200).json({
+      unreadRoomCount: unreadRoomIds.length
+    })
+    }catch(err){
+      console.error('Error in Message Count:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
   
 module.exports = {
     onlineUsers,
     getRooms,
     getMessages,
     pendingDelivery,
-    pendingRead
+    pendingRead,
+    unreadMessage
 }

@@ -13,4 +13,5 @@ router.get('/getRecordedSongsForAdmin', Admin.getRecordedSongsForAdmin)
 router.delete('/deleteRecordedSongByAdmin/:songId', Admin.deleteRecordedSongByAdmin)
 router.patch('/approveRecordedSong/:songId', Admin.ApproveRecordedSong)
 router.patch('/rejectRecordedSong/:songId', Admin.RejectRecordedSong)
+router.delete('/deleteAccount/:userId', Admin.deleteAccount)
 module.exports = router;

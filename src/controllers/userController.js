@@ -29,7 +29,6 @@ const { indexUser } = require('../config/elasticsearch');
 const { esClient } = require('../config/elasticsearch');
 const ChatRoom = require('../model/ChatRoom');
 
-
 const register = async (req, res) => {
   const { username, email, password, role, rank } = req.body;
 
@@ -902,6 +901,7 @@ const isReadNotification = async(req, res) =>{
     res.status(500).json({ error: "Lỗi server", details: error.message });
   }
 }
+
 const CreateCommentVideo = async (req, res) =>{
   try{
       const user_id = req.user.id;
@@ -1025,79 +1025,79 @@ const drive = google.drive({
   auth: authFile,
 });
 
-const uploadAvatar = async(req, res)=>{
-  try{
-    if (!req.file) {
-      return res.status(400).send('No file uploaded.');
-    }
-    const userId = req.user.id;
-    if (!userId) {
-      return res.status(401).json({ error: 'Chưa xác thực người dùng' });
-    }
-    const folderId = process.env.YOUR_FOLDER_ID;
-    // Thiết lập metadata cho file trên Drive
-    const fileMetadata = {
-      //đặt tên file = tên gốc
-      name: req.file.originalname,
-      parents: [folderId],
-    };
-    const media = {
-      mimeType: req.file.mimetype,
-      body: streamifier.createReadStream(req.file.buffer),
-    };
-    const response = await drive.files.create({
-      requestBody: fileMetadata,
-      media: media,
-      fields: 'id, name',
-    });
-    const fileId = response.data.id;
-    const fileUrl = `https://drive.google.com/uc?id=${fileId}`;
-    await User.update(
-      { avatar_url: fileUrl },
-      { where: { id: userId } }
-    )
-    return res.status(200).json({
-      message: 'Upload ảnh đại diện thành công',
-      avatar_url: fileUrl,
-    });
-  }catch (error) {
-    console.error('Error uploading file:', error);
-    throw error;
-  }
-}
+// const uploadAvatar = async(req, res)=>{
+//   try{
+//     if (!req.file) {
+//       return res.status(400).send('No file uploaded.');
+//     }
+//     const userId = req.user.id;
+//     if (!userId) {
+//       return res.status(401).json({ error: 'Chưa xác thực người dùng' });
+//     }
+//     const folderId = process.env.YOUR_FOLDER_ID;
+//     // Thiết lập metadata cho file trên Drive
+//     const fileMetadata = {
+//       //đặt tên file = tên gốc
+//       name: req.file.originalname,
+//       parents: [folderId],
+//     };
+//     const media = {
+//       mimeType: req.file.mimetype,
+//       body: streamifier.createReadStream(req.file.buffer),
+//     };
+//     const response = await drive.files.create({
+//       requestBody: fileMetadata,
+//       media: media,
+//       fields: 'id, name',
+//     });
+//     const fileId = response.data.id;
+//     const fileUrl = `https://drive.google.com/uc?id=${fileId}`;
+//     await User.update(
+//       { avatar_url: fileUrl },
+//       { where: { id: userId } }
+//     )
+//     return res.status(200).json({
+//       message: 'Upload ảnh đại diện thành công',
+//       avatar_url: fileUrl,
+//     });
+//   }catch (error) {
+//     console.error('Error uploading file:', error);
+//     throw error;
+//   }
+// }
 
-  const uploadImagePost = async(req, res)=>{
-    try{
-      if (!req.file) {
-        return res.status(400).send('No file uploaded.');
-      }
-      const folderId = process.env.YOUR_FOLDER_ID;
-      // Thiết lập metadata cho file trên Drive
-      const fileMetadata = {
-        //đặt tên file = tên gốc
-        name: req.file.originalname,
-        parents: [folderId],
-      };
-      const media = {
-        mimeType: req.file.mimetype,
-        body: streamifier.createReadStream(req.file.buffer),
-      };
-      const response = await drive.files.create({
-        requestBody: fileMetadata,
-        media: media,
-        fields: 'id, name',
-      });
-      const fileId = response.data.id;
-      const fileUrl = `https://drive.google.com/uc?id=${fileId}`;
-      return res.status(200).json({
-        message: 'Upload ảnh thành công',
-        avatar_url: fileUrl,
-      });
-    }catch (error) {
-      console.error('Error uploading file:', error);
-      throw error;
-    }
-}
+//   const uploadImagePost = async(req, res)=>{
+//     try{
+//       if (!req.file) {
+//         return res.status(400).send('No file uploaded.');
+//       }
+//       const folderId = process.env.YOUR_FOLDER_ID;
+//       // Thiết lập metadata cho file trên Drive
+//       const fileMetadata = {
+//         //đặt tên file = tên gốc
+//         name: req.file.originalname,
+//         parents: [folderId],
+//       };
+//       const media = {
+//         mimeType: req.file.mimetype,
+//         body: streamifier.createReadStream(req.file.buffer),
+//       };
+//       const response = await drive.files.create({
+//         requestBody: fileMetadata,
+//         media: media,
+//         fields: 'id, name',
+//       });
+//       const fileId = response.data.id;
+//       const fileUrl = `https://drive.google.com/uc?id=${fileId}`;
+//       return res.status(200).json({
+//         message: 'Upload ảnh thành công',
+//         avatar_url: fileUrl,
+//       });
+//     }catch (error) {
+//       console.error('Error uploading file:', error);
+//       throw error;
+//     }
+// }
 const createSticker = async (req, res) => {
   try {
     const { sticker_url, title, category } = req.body;
@@ -1538,8 +1538,8 @@ module.exports = {
   CreateCommentVideo,
   getCommentVideoList,
   verifyPurchase,
-  uploadAvatar,
-  uploadImagePost,
+  // uploadAvatar,
+  // uploadImagePost,
   createSticker,
   getSticker,
   search,
@@ -1561,5 +1561,5 @@ module.exports = {
   getAllVideoOfTopic,
   RecommendSongs,
   CheckPostingCondition,
-  activityStatistics
+  activityStatistics,
 };

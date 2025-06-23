@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const Admin = require('../model/Admin'); // Sử dụng model Admin
 const jwt = require('jsonwebtoken');
-const { RequestFromUser, User, Replies, Favorite } = require('../model');
+const { RequestFromUser, User, Replies, Favorite, CommentsVideo, Follow } = require('../model');
 const admin = require('firebase-admin');
 const NotificationUser = require('../model/NotificationUser');
 const { RecommendSongs } = require('./userController');
@@ -9,6 +9,11 @@ const RecordedSong = require('../model/RecordedSongs');
 const FavoritePost = require('../model/FavoritesPost');
 const Comments = require('../model/Comments');
 const sequelize = require('../config/database');
+const LiveStream = require('../model/LiveStream');
+const CommentLiveStream = require('../model/CommentLiveStream');
+const Subscription = require('../model/Subscription');
+const { Op } = require('sequelize');
+
 
 const loginAdmin = async (req, res) => {
   const { email, password } = req.body;
@@ -273,6 +278,39 @@ const RejectRecordedSong= async(req, res) =>{
   }
 }
 
+const deleteAccount = async (req, res) => {
+  try{
+    const {userId} = req.params;
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+    await Favorite.destroy({ where: { user_id: userId } });
+    await FavoritePost.destroy({ where: { user_id: userId } });
+    await Comments.destroy({ where: { user_id: userId } });
+    await CommentsVideo.destroy({ where: { user_id: userId } });
+    await NotificationUser.destroy({ where: { recipient_id: userId } });
+    await Follow.destroy({ where: { [Op.or]: [{ follower_id: userId }, { following_id: userId }] } });
+    await RequestFromUser.destroy({ where: { user_id: userId } });
+    await Replies.destroy({
+      where: {
+        request_id: {
+          [Op.in]: sequelize.literal(`(SELECT id FROM request_from_users WHERE user_id = ${userId})`)
+        }
+      }
+    });
+    await LiveStream.destroy({ where: { host_user_id: userId } });
+    await CommentLiveStream.destroy({ where: { user_id: userId } });
+    await RecordedSong.destroy({ where: { user_id: userId } });
+    await Subscription.destroy({ where: { userId: userId } });
+    await User.destroy({ where: { user_id: userId } });
+    return res.status(200).json({ message: "Đã xóa người dùng và các dữ liệu liên quan thành công" });
+  }catch (error) {
+    console.error("Lỗi khi remove user:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ", error: error.message });
+  }
+}
+
 
 module.exports = {
   loginAdmin,
@@ -284,4 +322,5 @@ module.exports = {
   deleteRecordedSongByAdmin,
   ApproveRecordedSong,
   RejectRecordedSong,
+  deleteAccount
 };

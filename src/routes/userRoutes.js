@@ -13,7 +13,7 @@ router.post('/register', UserController.register);
 router.post('/login', UserController.login);
 router.post('/logout',authenticateToken,UserController.logout);
 router.post('/forgotPassword', UserController.forgotPassword)
-router.patch('/updateProfile',authenticateToken,UserController.updateProfile)// update của người dùng
+router.patch('/updateProfile',authenticateToken,UserController.updateProfile)
 router.patch('/users/update/:id',UserController.updateUser)
 router.get('/userProfile',authenticateToken,UserController.userProfile)
 router.post('/createRecordedSong',authenticateToken,UserController.createRecordedSong)
@@ -39,8 +39,8 @@ router.post('/CreateCommentVideo',authenticateToken,UserController.CreateComment
 router.get('/getCommentVideoList/:video_id',UserController.getCommentVideoList)
 
 router.post('/verifyPurchase',UserController.verifyPurchase);
-router.post('/uploadAvatar',authenticateToken,upload.single('image'),UserController.uploadAvatar);
-router.post('/uploadImagePost',upload.single('image'),UserController.uploadImagePost)
+// router.post('/uploadAvatar',authenticateToken,upload.single('image'),UserController.uploadAvatar);
+// router.post('/uploadImagePost',upload.single('image'),UserController.uploadImagePost)
 
 router.post('/stickers',UserController.createSticker)
 router.get('/stickers',UserController.getSticker)

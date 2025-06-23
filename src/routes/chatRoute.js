@@ -8,4 +8,5 @@ router.get("/rooms",authenticateToken,ChatController.getRooms);
 router.get("/rooms/:roomId/messages",authenticateToken,ChatController.getMessages);
 router.get("/pendingDelivery",authenticateToken,ChatController.pendingDelivery);
 router.get("/pendingRead",authenticateToken,ChatController.pendingRead);
+router.get("/unreadMessage",authenticateToken,ChatController.unreadMessage);
 module.exports= router;

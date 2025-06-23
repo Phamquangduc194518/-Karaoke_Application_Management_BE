@@ -32,6 +32,9 @@ app.use('/api/chat',chatRoute);
 const registerSocketHandlers = require('./src/socket/chatSocket'); 
 registerSocketHandlers(io);
 
+const registerLiveStreamSocket = require('./src/socket/liveStreamSocket'); 
+registerLiveStreamSocket(io);
+
 sequelize
   .authenticate()
   .then(() => {
