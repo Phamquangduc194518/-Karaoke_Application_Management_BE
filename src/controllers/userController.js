@@ -1272,35 +1272,47 @@ const getIsFavoritePostToSongID = async(req, res)=>{
   }
 }
 
-const getStarAccount = async(req, res) =>{
-  try{
-      const account = await Follow.findAll({
-        attributes:[
-          'following_id',
-          [fn('COUNT', col('follower_id')), 'followersCount']
-        ],
-        group: ['following_id'],
-        having: where(fn('COUNT', col('follower_id')), '>', 2),
-        include: [
-          {
-            model: User,
-            as: 'following',
-            attributes: ['user_id', 'username', 'avatar_url'],
-            include:[
-              {
-                model: LiveStream, 
-                as: 'liveStream', 
-                where: { status: 'active' },
-                required: false, 
-                attributes: ['stream_id', 'title', 'status']
-              }
-            ]
-          }
-        ]
-      });
-      return res.status(200).json(account);
-  }catch (error) {
-    return res.status(500).json({ error: "Lỗi server", details: error.message });
+const getStarAccount = async (req, res) => {
+  try {
+    const account = await Follow.findAll({
+      attributes: [
+        'following_id',
+        [fn('COUNT', col('follower_id')), 'followersCount']
+      ],
+      include: [
+        {
+          model: User,
+          as: 'following',
+          attributes: ['user_id', 'username', 'avatar_url'],
+          include: [
+            {
+              model: LiveStream,
+              as: 'liveStream',
+              where: { status: 'active' },
+              required: false,
+              attributes: ['stream_id', 'title', 'status']
+            }
+          ]
+        }
+      ],
+      group: [
+        'following_id',
+        'following.user_id',
+        'following.username',
+        'following.avatar_url',
+        'following.liveStream.stream_id',
+        'following.liveStream.title',
+        'following.liveStream.status'
+      ],
+      having: where(fn('COUNT', col('follower_id')), '>', 2)
+    });
+
+    return res.status(200).json(account);
+  } catch (error) {
+    return res.status(500).json({
+      error: "Lỗi server",
+      details: error.message
+    });
   }
 }
 
