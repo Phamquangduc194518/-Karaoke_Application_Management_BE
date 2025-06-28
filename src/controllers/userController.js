@@ -34,7 +34,7 @@ const credentials = JSON.parse(raw);
 credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
 
 const raw2 = process.env.SERVICE_ACCOUNT_KEY;
-const credentials2 = JSON.parse(raw);
+const credentials2 = JSON.parse(raw2);
 credentials2.private_key = credentials2.private_key.replace(/\\n/g, '\n');
 
 const register = async (req, res) => {
