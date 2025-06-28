@@ -373,7 +373,7 @@ const getRecordedSongList = async (req, res) => {
     const currentUserId = req.user.id;
 
     await sequelize.query(`
-      UPDATE recordedsong rs
+      UPDATE RecordedSong rs
       LEFT JOIN (
         SELECT post_id, COUNT(*) as like_count
         FROM favorite_post
@@ -383,7 +383,7 @@ const getRecordedSongList = async (req, res) => {
     `, { type: sequelize.QueryTypes.UPDATE });
 
     await sequelize.query(`
-      UPDATE recordedsong rs
+      UPDATE RecordedSong rs
       LEFT JOIN (
         SELECT song_id, COUNT(*) as comment_count
         FROM comments
