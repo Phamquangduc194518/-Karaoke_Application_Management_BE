@@ -8,8 +8,7 @@ const { User } = require('../model');
 const { Op, Sequelize } = require("sequelize");
 const admin = require('firebase-admin');
 const NotificationUser = require('../model/NotificationUser');
-// const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_FIREBASE);
-const serviceAccount = require(process.env.SERVICE_ACCOUNT_FIREBASE);
+const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_FIREBASE);
 
 
 if (!admin.apps.length) {
