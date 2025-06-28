@@ -952,7 +952,7 @@ const getCommentVideoList = async (req, res) =>{
 }
 
 const auth = new google.auth.GoogleAuth({
-  keyFile: process.env.SERVICE_ACCOUNT_KEY,
+  keyFile: JSON.parse(process.env.SERVICE_ACCOUNT_KEY),
   scopes: ['https://www.googleapis.com/auth/androidpublisher'],
 });
 
@@ -1021,7 +1021,7 @@ const verifyPurchase = async (req, res) => {
 }
 
 const authFile = new google.auth.GoogleAuth({
-  keyFile: process.env.SERVICE_ACCOUNT_FILE,
+  keyFile: JSON.parse(process.env.SERVICE_ACCOUNT_FILE),
   scopes: ['https://www.googleapis.com/auth/drive'],
 })
 
