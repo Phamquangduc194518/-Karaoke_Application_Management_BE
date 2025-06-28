@@ -20,7 +20,8 @@ const NotificationUser = require('../model/NotificationUser');
 const FavoritePost = require('../model/FavoritesPost');
 const LiveStream = require('../model/LiveStream');
 const admin = require('firebase-admin');
-const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_FIREBASE);
+const serviceAccount = require(process.env.SERVICE_ACCOUNT_FIREBASE);
+// const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_FIREBASE);
 const RequestFromUser = require('../model/RequestFromUser');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
@@ -964,6 +965,7 @@ const androidpublisher = google.androidpublisher({
 const verifyPurchase = async (req, res) => {
   try{
     const {user_id, packageName, productId, purchaseToken} = req.body;
+    console.log("📥 Nhận yêu cầu verify purchase:", req.body);
     if (!user_id || !packageName || !productId || !purchaseToken) {
       return res.status(400).json({ error: 'Thiếu thông tin cần thiết' });
     }
@@ -974,6 +976,7 @@ const verifyPurchase = async (req, res) => {
       token: purchaseToken,
     });
     const purchaseInfo = result.data;
+    console.log("🧾 Thông tin từ Google:", purchaseInfo);
     if (purchaseInfo.paymentState !== 1) {
       return res.status(400).json({ error: 'Giao dịch không hợp lệ' });
     }
@@ -991,12 +994,14 @@ const verifyPurchase = async (req, res) => {
     }
     let subscription = await Subscription.findOne({ where: { userId: user_id } });
     if(subscription){
+      console.log("📝 Cập nhật subscription cũ");
       subscription.purchaseToken= purchaseToken
       subscription.orderId = purchaseInfo.orderId;
       subscription.expiryTime = purchaseInfo.expiryTimeMillis;
       subscription.paymentState = purchaseInfo.paymentState;
       await subscription.save();
     }else{
+      console.log("🆕 Tạo mới subscription");
       subscription = await Subscription.create({
         userId: user_id,
         purchaseToken: purchaseToken,
@@ -1008,6 +1013,7 @@ const verifyPurchase = async (req, res) => {
     }
     user.role = 'vip';
     await user.save();
+    console.log("🎉 Đã cập nhật quyền VIP cho user:", user.id);
     return res.status(200).json({ success: true});
   }catch (err) {
     console.error('Lỗi xác minh giao dịch:', err);
