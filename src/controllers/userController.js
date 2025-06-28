@@ -21,6 +21,7 @@ const FavoritePost = require('../model/FavoritesPost');
 const LiveStream = require('../model/LiveStream');
 const admin = require('firebase-admin');
 const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_FIREBASE);
+serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
 const RequestFromUser = require('../model/RequestFromUser');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
@@ -28,6 +29,13 @@ const natural = require('natural');
 const { indexUser } = require('../config/elasticsearch');
 const { esClient } = require('../config/elasticsearch');
 const ChatRoom = require('../model/ChatRoom');
+const raw = process.env.SERVICE_ACCOUNT_FILE;
+const credentials = JSON.parse(raw);
+credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+
+const raw2 = process.env.SERVICE_ACCOUNT_KEY;
+const credentials2 = JSON.parse(raw);
+credentials2.private_key = credentials2.private_key.replace(/\\n/g, '\n');
 
 const register = async (req, res) => {
   const { username, email, password, role, rank } = req.body;
@@ -952,7 +960,7 @@ const getCommentVideoList = async (req, res) =>{
 }
 
 const auth = new google.auth.GoogleAuth({
-  keyFile: JSON.parse(process.env.SERVICE_ACCOUNT_KEY),
+   credentials: credentials2,
   scopes: ['https://www.googleapis.com/auth/androidpublisher'],
 });
 
@@ -1021,7 +1029,7 @@ const verifyPurchase = async (req, res) => {
 }
 
 const authFile = new google.auth.GoogleAuth({
-  keyFile: JSON.parse(process.env.SERVICE_ACCOUNT_FILE),
+  credentials: credentials,
   scopes: ['https://www.googleapis.com/auth/drive'],
 })
 

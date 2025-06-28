@@ -9,6 +9,7 @@ const { Op, Sequelize } = require("sequelize");
 const admin = require('firebase-admin');
 const NotificationUser = require('../model/NotificationUser');
 const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_FIREBASE);
+serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
 
 
 if (!admin.apps.length) {
