@@ -16,8 +16,8 @@ if (!admin.apps.length) {
   });
 }
 
-const registerSocketHandlers = (io) => {
-  io.on('connection', (socket) => {
+const registerSocketHandlers = (namespace) => {
+  namespace.on('connection', (socket) => {
     const token = socket.handshake.query.token;
     if (!token) {
       return socket.disconnect();
@@ -31,7 +31,7 @@ const registerSocketHandlers = (io) => {
     }
     socket.join(`user_${userId}`);
     console.log(`Client connected: user_${userId}`);
-    io.emit('user_connected', { userId });
+    namespace.emit('user_connected', { userId });
     socket.on('message', async ({ event, data }) => {
       if (event === 'private_message') {
         const { content, to } = data;
@@ -101,8 +101,8 @@ const registerSocketHandlers = (io) => {
           }
         };
         console.log("payload", payloadToClient)
-        io.to(`user_${to}`).emit('private_message', payloadToClient);
-        io.to(`user_${userId}`).emit('private_message', payloadToClient);
+        namespace.to(`user_${to}`).emit('private_message', payloadToClient);
+        namespace.to(`user_${userId}`).emit('private_message', payloadToClient);
         if (recipient && recipient.device_token) {
           sendNotificationMessage(recipient.device_token, sender.username);
         }
@@ -135,8 +135,8 @@ const registerSocketHandlers = (io) => {
               updatedAt: new Date()
             };
             console.log("payload", payload)
-            io.to(`user_${recipientId}`).emit('message_status_updated', payload);
-            io.to(`user_${message.sender_id}`).emit('message_status_updated', payload);
+            namespace.to(`user_${recipientId}`).emit('message_status_updated', payload);
+            namespace.to(`user_${message.sender_id}`).emit('message_status_updated', payload);
           }
         } catch (err) {
           console.error('mark_delivered error:', err);
@@ -160,7 +160,7 @@ const registerSocketHandlers = (io) => {
         if (updated[0] > 0) {
           const message = await ChatMessage.findByPk(messageId);
           const statusPayload = { message_id: messageId, user_id: userId, status: 'read' };
-          io.to(`room_${message.room_id}`).emit('mark_read', statusPayload);
+          namespace.to(`room_${message.room_id}`).emit('mark_read', statusPayload);
         }
       }
     });

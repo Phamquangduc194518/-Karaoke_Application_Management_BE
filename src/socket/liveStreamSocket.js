@@ -2,8 +2,8 @@ const jwt = require("jsonwebtoken");
 const CommentLiveStream = require('../model/CommentLiveStream');
 const User = require('../model/User');
 
-const registerLiveStreamSocket = (io) => {
-  io.on('connection', async (socket) => {
+const registerLiveStreamSocket = (namespace) => {
+  namespace.on('connection', async (socket) => {
     console.log("🔥 Có 1 client đang cố kết nối LiveStream Socket...");
     const { streamId, token } = socket.handshake.query;
 
@@ -40,7 +40,7 @@ const registerLiveStreamSocket = (io) => {
         include: [{ model: User, as: 'userCommentLive', attributes: ['user_id', 'username', 'avatar_url'] }],
       });
 
-      io.to(`livestream_${streamId}`).emit('new_comment', fullComment);
+      namespace.to(`livestream_${streamId}`).emit('new_comment', fullComment);
     });
 
     socket.on('disconnect', () => {
