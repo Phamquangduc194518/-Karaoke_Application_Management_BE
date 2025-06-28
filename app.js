@@ -29,11 +29,13 @@ app.use('/api/song',songRoutes);
 app.use('/api/liveStream',liveStreamRoute);
 app.use('/api/chat',chatRoute);
 
+const chatNamespace = io.of('/chat');
 const registerSocketHandlers = require('./src/socket/chatSocket'); 
-registerSocketHandlers(io);
+registerSocketHandlers(chatNamespace);
 
+const liveStreamNamespace = io.of('/livestream');
 const registerLiveStreamSocket = require('./src/socket/liveStreamSocket'); 
-registerLiveStreamSocket(io);
+registerLiveStreamSocket(liveStreamNamespace);
 
 sequelize
   .authenticate()

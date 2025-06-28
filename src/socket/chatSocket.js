@@ -167,6 +167,7 @@ const registerSocketHandlers = (namespace) => {
 
     socket.on('disconnect', () => {
       socket.leave(`user_${userId}`);
+      console.log(`👋 User ${userId} left chat`);
     });
   });
 };
