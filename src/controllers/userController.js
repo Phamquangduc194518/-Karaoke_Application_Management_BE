@@ -386,7 +386,7 @@ const getRecordedSongList = async (req, res) => {
       UPDATE RecordedSong rs
       LEFT JOIN (
         SELECT song_id, COUNT(*) as comment_count
-        FROM comments
+        FROM Comments
         GROUP BY song_id
       ) AS c ON rs.id = c.song_id
       SET rs.comments_count = IFNULL(c.comment_count, 0)
